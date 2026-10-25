@@ -16,10 +16,6 @@ public class Assessment {
     public Assessment() {
     }
 
-    /**
-     * Package-private constructor used by {@link AssessmentBuilder} to assemble
-     * an Assessment from its collected parts.
-     */
     Assessment(UUID assessmentId, LocalDateTime createdAt, String freeTextDescription,
                List<SymptomEntry> symptomEntries) {
         this.assessmentId = assessmentId;
