@@ -7,9 +7,9 @@ public class SymptomChecklist {
 
     private UUID checklistId;
     private String version;
-    private List<Symptom> symptoms;
+    private SymptomGroup root;
 
     public List<Symptom> getSymptoms() {
-        return null;
+        return root == null ? List.of() : root.getSymptoms();
     }
 }
