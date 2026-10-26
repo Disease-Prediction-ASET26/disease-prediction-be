@@ -1,4 +1,7 @@
-package com.diseaseprediction.domain;
+package com.diseaseprediction.service;
+
+import com.diseaseprediction.domain.Doctor;
+import com.diseaseprediction.domain.Report;
 
 public class DoctorInboxObserver implements ReportObserver {
 
@@ -10,6 +13,7 @@ public class DoctorInboxObserver implements ReportObserver {
 
     @Override
     public void onReportReady(Report report) {
-        doctor.onReportReady(report);
+        report.send(doctor);
+        doctor.openReport(report);
     }
 }

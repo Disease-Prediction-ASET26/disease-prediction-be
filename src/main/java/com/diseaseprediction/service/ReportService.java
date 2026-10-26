@@ -1,4 +1,6 @@
-package com.diseaseprediction.domain;
+package com.diseaseprediction.service;
+
+import com.diseaseprediction.domain.Report;
 
 import java.util.ArrayList;
 import java.util.List;

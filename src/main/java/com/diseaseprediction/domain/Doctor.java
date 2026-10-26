@@ -18,9 +18,4 @@ public class Doctor extends User {
 
     public void addClinicalNotes(Report report, String notes) {
     }
-
-    public void onReportReady(Report report) {
-        Notification notification = new Notification("New report", "A report is ready for review.");
-        notification.send();
-    }
 }
