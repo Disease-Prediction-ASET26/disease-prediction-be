@@ -1,4 +1,14 @@
-package com.diseaseprediction.domain;
+package com.diseaseprediction.service;
+
+import com.diseaseprediction.domain.Assessment;
+import com.diseaseprediction.domain.AssessmentBuilder;
+import com.diseaseprediction.domain.Doctor;
+import com.diseaseprediction.domain.MLModel;
+import com.diseaseprediction.domain.Notification;
+import com.diseaseprediction.domain.PredictionResult;
+import com.diseaseprediction.domain.RedFlagRule;
+import com.diseaseprediction.domain.Report;
+import com.diseaseprediction.domain.SymptomEntry;
 
 import org.springframework.stereotype.Service;
 
