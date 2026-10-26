@@ -11,6 +11,14 @@ public class Notification {
     private LocalDateTime sentAt;
     private boolean isRead = false;
 
+    public Notification() {
+    }
+
+    public Notification(String subject, String message) {
+        this.subject = subject;
+        this.message = message;
+    }
+
     public void send() {
     }
 }

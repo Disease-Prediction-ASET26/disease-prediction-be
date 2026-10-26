@@ -18,6 +18,10 @@ public abstract class User {
         return false;
     }
 
+    public String getEmail() {
+        return email;
+    }
+
     public void logout() {
     }
 }

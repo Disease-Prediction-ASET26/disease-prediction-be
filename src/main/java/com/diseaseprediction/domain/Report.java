@@ -18,11 +18,16 @@ public class Report {
     private Assessment assessment;
 
     public void send(Doctor doctor) {
+        status = ReportStatus.SENT;
+        sentAt = LocalDateTime.now();
     }
 
     public void markOpened() {
+        status = ReportStatus.OPENED;
     }
 
     public void markReviewed(String notes) {
+        clinicalNotes = notes;
+        status = ReportStatus.REVIEWED;
     }
 }
