@@ -34,4 +34,8 @@ public class Assessment {
     public PredictionResult submit() {
         return null;
     }
+
+    public String getFreeTextDescription() {
+        return freeTextDescription;
+    }
 }
