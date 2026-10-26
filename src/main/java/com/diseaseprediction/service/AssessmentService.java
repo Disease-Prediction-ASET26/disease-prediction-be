@@ -19,10 +19,12 @@ public class AssessmentService {
 
     private final MLModel mlModel;
     private final List<RedFlagRule> redFlagRules;
+    private final ReportService reportService;
 
-    public AssessmentService(MLModel mlModel, List<RedFlagRule> redFlagRules) {
+    public AssessmentService(MLModel mlModel, List<RedFlagRule> redFlagRules, ReportService reportService) {
         this.mlModel = mlModel;
         this.redFlagRules = redFlagRules;
+        this.reportService = reportService;
     }
 
     public PredictionResult runAssessment(String freeText, List<SymptomEntry> symptoms, Doctor recipient) {
@@ -33,7 +35,7 @@ public class AssessmentService {
         Assessment assessment = builder.build();
 
         if (assessment.checkRedFlags(redFlagRules)) {
-            new Notification().send();
+            new Notification("Emergency detected", "Your symptoms may require immediate care.").send();
         }
 
         PredictionResult result = assessment.submit();
@@ -45,8 +47,8 @@ public class AssessmentService {
         if (recipient != null) {
             report.send(recipient);
         }
+        reportService.notifyObservers(report);
 
-        new Notification().send();
         return result;
     }
 }
