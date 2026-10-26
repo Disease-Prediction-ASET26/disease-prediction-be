@@ -15,4 +15,8 @@ public class RedFlagRule {
     public boolean matches(Assessment assessment) {
         return false;
     }
+
+    public String getEmergencyMessage() {
+        return emergencyMessage;
+    }
 }
