@@ -13,6 +13,17 @@ public class Assessment {
     private List<SymptomEntry> symptomEntries;
     private PredictionResult result;
 
+    public Assessment() {
+    }
+
+    Assessment(UUID assessmentId, LocalDateTime createdAt, String freeTextDescription,
+               List<SymptomEntry> symptomEntries) {
+        this.assessmentId = assessmentId;
+        this.createdAt = createdAt;
+        this.freeTextDescription = freeTextDescription;
+        this.symptomEntries = symptomEntries;
+    }
+
     public void addSymptomEntry(SymptomEntry entry) {
     }
 
