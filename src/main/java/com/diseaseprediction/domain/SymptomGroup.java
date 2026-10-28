@@ -8,8 +8,7 @@ public class SymptomGroup implements SymptomComponent {
     private String name;
     private final List<SymptomComponent> children = new ArrayList<>();
 
-    public SymptomGroup() {
-    }
+    public SymptomGroup() {}
 
     public SymptomGroup(String name) {
         this.name = name;

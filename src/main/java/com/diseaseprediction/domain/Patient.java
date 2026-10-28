@@ -10,23 +10,19 @@ public class Patient extends User {
     private boolean consentGiven;
     private LocalDateTime consentDate;
 
-    public void giveConsent() {
-    }
+    public void giveConsent() {}
 
-    public void revokeConsent() {
-    }
+    public void revokeConsent() {}
 
     public Assessment startAssessment() {
         return null;
     }
 
-    public void forwardReport(Report report, Doctor doctor) {
-    }
+    public void forwardReport(Report report, Doctor doctor) {}
 
     public File exportData() {
         return null;
     }
 
-    public void deleteAccount() {
-    }
+    public void deleteAccount() {}
 }

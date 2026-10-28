@@ -14,8 +14,9 @@ public class EmailReportObserver implements ReportObserver {
 
     @Override
     public void onReportReady(Report report) {
-        Notification notification = new Notification("Report ready",
-                "A new report is available for " + doctor.getEmail());
+        Notification notification =
+                new Notification(
+                        "Report ready", "A new report is available for " + doctor.getEmail());
         notification.send();
     }
 }

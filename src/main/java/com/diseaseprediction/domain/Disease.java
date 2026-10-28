@@ -1,7 +1,5 @@
 package com.diseaseprediction.domain;
 
-import lombok.Getter;
-
 import java.util.List;
 import java.util.UUID;
 
@@ -15,5 +13,4 @@ public class Disease {
     public List<Precaution> getPrecautions() {
         return precautions;
     }
-
 }
