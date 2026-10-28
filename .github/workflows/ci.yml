@@ -1,0 +1,200 @@
+# Activation: https://github.com/Disease-Prediction-ASET26/disease-prediction-ci/blob/main/README.md
+name: CI
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+    types:
+    - opened
+    - synchronize
+    - reopened
+    - ready_for_review
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  workflow-lint:
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && github.event.action != 'closed' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: Disease-Prediction-ASET26/disease-prediction-ci/actions/validate-workflows@b4745f8ca8fcb941ad515f24b0c202bad5d321c8 # v1.0.0
+  lint:
+    if: ${{ ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && github.event.action != 'closed') && false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+    - run: |
+        echo "::error::Add the Java lint configuration and its command."
+        exit 1
+  build:
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && github.event.action != 'closed' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      with:
+        java-version: '25'
+        distribution: temurin
+        cache: maven
+    - run: bash mvnw -B -ntp -DskipTests package
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: backend-build
+        path: |
+          target/*.jar
+          target/classes/
+          target/test-classes/
+        retention-days: 3
+        if-no-files-found: error
+  unit-test:
+    if: ${{ ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && github.event.action != 'closed') && false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+    - run: |
+        echo "::error::Add a real unit test suite and replace the disabled command."
+        exit 1
+  integration-test:
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && github.event.action != 'closed' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs:
+    - build
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      with:
+        java-version: '25'
+        distribution: temurin
+        cache: maven
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: backend-build
+        path: target
+    - name: Spring context smoke test
+      run: bash mvnw -B -ntp -Dtest=DiseasePredictionBeApplicationTests -Dsurefire.failIfNoSpecifiedTests=true test
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      if: ${{ always() }}
+      with:
+        name: integration-test-results
+        path: target/surefire-reports/
+        retention-days: 3
+        if-no-files-found: warn
+  sonarqube:
+    if: ${{ ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && github.event.action != 'closed') && (vars.SONAR_ENABLED == 'true' && github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs:
+    - build
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+        fetch-depth: 0
+    - name: Require SonarQube configuration
+      env:
+        SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+        SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: |
+        test -n "$SONAR_HOST_URL"
+        test -n "$SONAR_PROJECT_KEY"
+        test -n "$SONAR_TOKEN"
+    - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      with:
+        java-version: '25'
+        distribution: temurin
+        cache: maven
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: backend-build
+        path: target
+    - name: SonarQube analysis and quality gate
+      env:
+        SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+      run: |
+        bash mvnw -B -ntp org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar -Dsonar.projectKey="$SONAR_PROJECT_KEY" -Dsonar.qualitygate.wait=true -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+  owasp:
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && github.event.action != 'closed' }}
+    needs:
+    - build
+    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/dependency-scan.yml@b4745f8ca8fcb941ad515f24b0c202bad5d321c8 # v1.0.0
+    permissions:
+      contents: read
+      packages: read
+    with:
+      ecosystem: maven
+      build-artifact: backend-build
+  containerize:
+    name: containerize / scan
+    if: ${{ !cancelled() && ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name
+      == github.repository) && github.event.action != 'closed') && vars.CONTAINER_ENABLED == 'true' && !contains(needs.*.result,
+      'failure') && !contains(needs.*.result, 'cancelled') && needs['workflow-lint'].result == 'success' && needs['build'].result
+      == 'success' && needs['integration-test'].result == 'success' && needs['owasp'].result == 'success' && (!(vars.SONAR_ENABLED
+      == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request') || needs.sonarqube.result
+      == 'success') }}
+    needs:
+    - workflow-lint
+    - lint
+    - build
+    - unit-test
+    - integration-test
+    - sonarqube
+    - owasp
+    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/container.yml@b4745f8ca8fcb941ad515f24b0c202bad5d321c8 # v1.0.0
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: read
+    with:
+      build-artifact: backend-build
+  ci:
+    if: ${{ always() && ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name ==
+      github.repository) && github.event.action != 'closed') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs:
+    - workflow-lint
+    - lint
+    - build
+    - unit-test
+    - integration-test
+    - sonarqube
+    - owasp
+    - containerize
+    steps:
+    - uses: Disease-Prediction-ASET26/disease-prediction-ci/actions/ci-summary@b4745f8ca8fcb941ad515f24b0c202bad5d321c8 # v1.0.0
+      with:
+        needs: ${{ toJSON(needs) }}
+        disabled: '{"lint": "Add the Java lint configuration and its command.", "unit-test": "Add a real unit test
+          suite and replace the disabled command.", "sonarqube": "Main-only. Configure SONAR_HOST_URL, SONAR_PROJECT_KEY,
+          SONAR_TOKEN and enable SONAR_ENABLED.", "containerize": "Supply a root Dockerfile, then enable CONTAINER_ENABLED.
+          Containerize and scan run together."}'
+        enabled: ${{ format('["{0}","{1}"]', (vars.SONAR_ENABLED == 'true' && github.ref == 'refs/heads/main' &&
+          github.event_name != 'pull_request') && 'sonarqube' || '', vars.CONTAINER_ENABLED == 'true' && 'containerize'
+          || '') }}
