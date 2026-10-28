@@ -25,7 +25,6 @@ public class AssessmentBuilder {
                 UUID.randomUUID(),
                 LocalDateTime.now(),
                 freeTextDescription,
-                new ArrayList<>(symptomEntries)
-        );
+                new ArrayList<>(symptomEntries));
     }
 }

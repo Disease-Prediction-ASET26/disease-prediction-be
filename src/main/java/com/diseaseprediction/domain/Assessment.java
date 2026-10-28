@@ -13,19 +13,20 @@ public class Assessment {
     private List<SymptomEntry> symptomEntries;
     private PredictionResult result;
 
-    public Assessment() {
-    }
+    public Assessment() {}
 
-    Assessment(UUID assessmentId, LocalDateTime createdAt, String freeTextDescription,
-               List<SymptomEntry> symptomEntries) {
+    Assessment(
+            UUID assessmentId,
+            LocalDateTime createdAt,
+            String freeTextDescription,
+            List<SymptomEntry> symptomEntries) {
         this.assessmentId = assessmentId;
         this.createdAt = createdAt;
         this.freeTextDescription = freeTextDescription;
         this.symptomEntries = symptomEntries;
     }
 
-    public void addSymptomEntry(SymptomEntry entry) {
-    }
+    public void addSymptomEntry(SymptomEntry entry) {}
 
     public boolean checkRedFlags(List<RedFlagRule> rules) {
         return false;

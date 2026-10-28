@@ -12,7 +12,9 @@ public class BreathingHandler extends RedFlagHandler {
     @Override
     protected boolean appliesTo(Assessment assessment) {
         String text = describe(assessment);
-        return text.contains("shortness of breath") || text.contains("difficulty breathing")
-                || text.contains("cannot breathe") || text.contains("can't breathe");
+        return text.contains("shortness of breath")
+                || text.contains("difficulty breathing")
+                || text.contains("cannot breathe")
+                || text.contains("can't breathe");
     }
 }

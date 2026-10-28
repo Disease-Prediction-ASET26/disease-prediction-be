@@ -1,0 +1,19 @@
+# Install pre-commit once with: pipx install pre-commit
+# Install the hook in this checkout with: pre-commit install
+# Run all hooks with: pre-commit run --all-files
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-merge-conflict
+  - repo: local
+    hooks:
+      - id: java-format
+        name: Format Java with Spotless
+        entry: ./mvnw -q spotless:apply
+        language: system
+        files: \.java$
+        pass_filenames: false

@@ -1,5 +1,7 @@
 package com.diseaseprediction.domain.enums;
 
 public enum UserRole {
-    PATIENT, DOCTOR, ADMIN
+    PATIENT,
+    DOCTOR,
+    ADMIN
 }
