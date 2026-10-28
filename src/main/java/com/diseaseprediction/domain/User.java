@@ -22,6 +22,5 @@ public abstract class User {
         return email;
     }
 
-    public void logout() {
-    }
+    public void logout() {}
 }

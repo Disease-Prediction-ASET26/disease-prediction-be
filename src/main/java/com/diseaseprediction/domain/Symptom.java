@@ -3,7 +3,6 @@ package com.diseaseprediction.domain;
 import java.util.List;
 import java.util.UUID;
 
-
 public class Symptom implements SymptomComponent {
 
     private UUID symptomId;

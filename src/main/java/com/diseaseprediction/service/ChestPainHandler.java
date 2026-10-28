@@ -12,7 +12,8 @@ public class ChestPainHandler extends RedFlagHandler {
     @Override
     protected boolean appliesTo(Assessment assessment) {
         String text = describe(assessment);
-        return text.contains("chest pain") || text.contains("chest pressure")
+        return text.contains("chest pain")
+                || text.contains("chest pressure")
                 || text.contains("tightness in chest");
     }
 }

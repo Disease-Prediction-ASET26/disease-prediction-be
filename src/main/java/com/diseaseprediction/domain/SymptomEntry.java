@@ -12,7 +12,7 @@ public class SymptomEntry {
     private int durationDays;
     private boolean isMapped;
 
-    public Symptom mapToSymptom(){
+    public Symptom mapToSymptom() {
         return new Symptom();
     }
 }

@@ -16,6 +16,5 @@ public class Doctor extends User {
         return null;
     }
 
-    public void addClinicalNotes(Report report, String notes) {
-    }
+    public void addClinicalNotes(Report report, String notes) {}
 }
