@@ -108,4 +108,62 @@ class AssessmentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.emergencyDetected").value(true));
     }
+
+    @Test
+    void checkedChestPainSymptomIsFlaggedAsEmergency() throws Exception {
+        String body =
+                """
+                {
+                  "freeText": "",
+                  "symptomEntries": [
+                    { "rawText": "chest_pain", "severity": "MODERATE", "durationDays": 0, "isMapped": true }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(
+                        post("/api/assessments")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.emergencyDetected").value(true));
+    }
+
+    @Test
+    void checkedBreathlessnessSymptomIsFlaggedAsEmergency() throws Exception {
+        String body =
+                """
+                {
+                  "symptomEntries": [
+                    { "rawText": "breathlessness", "severity": "SEVERE", "durationDays": 0, "isMapped": true }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(
+                        post("/api/assessments")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.emergencyDetected").value(true));
+    }
+
+    @Test
+    void ordinaryCheckedSymptomIsNotAnEmergency() throws Exception {
+        String body =
+                """
+                {
+                  "symptomEntries": [
+                    { "rawText": "cough", "severity": "MILD", "durationDays": 0, "isMapped": true }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(
+                        post("/api/assessments")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.emergencyDetected").value(false));
+    }
 }
