@@ -4,6 +4,7 @@ import com.diseaseprediction.api.model.AssessmentRequest;
 import com.diseaseprediction.api.model.AssessmentResponse;
 import com.diseaseprediction.api.model.PredictionResult;
 import com.diseaseprediction.api.model.SymptomEntry;
+import com.diseaseprediction.exception.InvalidAssessmentRequestException;
 import com.diseaseprediction.service.prediction.PredictionClient;
 
 import org.springframework.stereotype.Service;
