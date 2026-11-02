@@ -47,10 +47,16 @@ public class AssessmentApiService {
      * <em>before</em> calling the prediction service so an emergency is surfaced even if prediction
      * fails.
      *
-     * @param request the validated assessment request
+     * @param request the assessment request
      * @return the assessment response carrying the emergency flag and prediction result
+     * @throws InvalidAssessmentRequestException if the request carries no symptom signal
      */
     public AssessmentResponse runAssessment(AssessmentRequest request) {
+        if (request == null || !hasAnySymptomSignal(request)) {
+            throw new InvalidAssessmentRequestException(
+                    "Assessment must include free text or at least one symptom entry.");
+        }
+
         boolean emergencyDetected = detectEmergency(request);
 
         PredictionResult result =
@@ -60,6 +66,17 @@ public class AssessmentApiService {
                 .assessmentId(UUID.randomUUID())
                 .emergencyDetected(emergencyDetected)
                 .result(result);
+    }
+
+    /**
+     * A request carries a symptom signal when it has either non-blank free text or at least one
+     * symptom entry. The validation lives in the service so controllers remain thin pass-throughs.
+     */
+    private static boolean hasAnySymptomSignal(AssessmentRequest request) {
+        boolean hasText = request.getFreeText() != null && !request.getFreeText().isBlank();
+        boolean hasEntries =
+                request.getSymptomEntries() != null && !request.getSymptomEntries().isEmpty();
+        return hasText || hasEntries;
     }
 
     /**

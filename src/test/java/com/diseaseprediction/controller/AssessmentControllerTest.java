@@ -27,8 +27,11 @@ import java.util.UUID;
 
 /**
  * MDD Iteration 2 — Step 5 validation. Verifies the controller slice against the API contract: a
- * valid request yields 200 with a prediction result body; an empty request yields 400. The {@link
- * PredictionClient} is mocked so the backend slice is tested without a live Python service.
+ * valid request yields 200 with a prediction result body; an empty request yields 400. The 400 now
+ * originates in {@link AssessmentApiService} (via {@code InvalidAssessmentRequestException} mapped
+ * to {@code HttpStatus.BAD_REQUEST}) rather than from an inline controller check; the external
+ * assertions below are unchanged. The {@link PredictionClient} is mocked so the backend slice is
+ * tested without a live Python service.
  */
 @WebMvcTest(AssessmentController.class)
 @Import({AssessmentApiService.class, AssessmentControllerTest.MockConfig.class})
