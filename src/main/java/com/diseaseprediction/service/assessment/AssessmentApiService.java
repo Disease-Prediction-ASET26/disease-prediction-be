@@ -1,9 +1,9 @@
 package com.diseaseprediction.service.assessment;
 
-import com.diseaseprediction.controller.dto.AssessmentRequest;
-import com.diseaseprediction.controller.dto.AssessmentResponse;
-import com.diseaseprediction.controller.dto.PredictionResultDto;
-import com.diseaseprediction.controller.dto.SymptomEntryDto;
+import com.diseaseprediction.api.model.AssessmentRequest;
+import com.diseaseprediction.api.model.AssessmentResponse;
+import com.diseaseprediction.api.model.PredictionResult;
+import com.diseaseprediction.api.model.SymptomEntry;
 import com.diseaseprediction.service.prediction.PredictionClient;
 
 import org.springframework.stereotype.Service;
@@ -18,6 +18,11 @@ import java.util.UUID;
  * <p>MDD Iteration 2 — model element: {@code AssessmentService.runAssessment()}. The backend does
  * not predict; it orchestrates: it runs a lightweight emergency (red-flag) check and then delegates
  * prediction to the {@link PredictionClient} across the SOA boundary.
+ *
+ * <p>This service is the seam between the OpenAPI-generated API DTOs ({@link AssessmentRequest} /
+ * {@link AssessmentResponse} / {@link PredictionResult}) and the domain model. The DTO&lt;-&gt;domain
+ * boundary deliberately lives here so MapStruct mappers can later be slotted in without touching
+ * the generated DTOs or the controller.
  *
  * <p>Named {@code AssessmentApiService} to coexist with the pre-existing domain-coupled {@code
  * AssessmentService}; this class is the web-layer orchestrator introduced by Iteration 2.
@@ -48,10 +53,13 @@ public class AssessmentApiService {
     public AssessmentResponse runAssessment(AssessmentRequest request) {
         boolean emergencyDetected = detectEmergency(request);
 
-        PredictionResultDto result =
-                predictionClient.predict(request.freeText(), request.symptomEntries());
+        PredictionResult result =
+                predictionClient.predict(request.getFreeText(), request.getSymptomEntries());
 
-        return new AssessmentResponse(UUID.randomUUID(), emergencyDetected, result);
+        return new AssessmentResponse()
+                .assessmentId(UUID.randomUUID())
+                .emergencyDetected(emergencyDetected)
+                .result(result);
     }
 
     /**
@@ -60,13 +68,13 @@ public class AssessmentApiService {
      * kept here so the web slice is self-contained and testable.
      */
     private boolean detectEmergency(AssessmentRequest request) {
-        if (containsRedFlag(request.freeText())) {
+        if (containsRedFlag(request.getFreeText())) {
             return true;
         }
-        List<SymptomEntryDto> entries = request.symptomEntries();
+        List<SymptomEntry> entries = request.getSymptomEntries();
         return entries != null
                 && entries.stream()
-                        .anyMatch(entry -> entry != null && containsRedFlag(entry.rawText()));
+                        .anyMatch(entry -> entry != null && containsRedFlag(entry.getRawText()));
     }
 
     private static boolean containsRedFlag(String text) {
