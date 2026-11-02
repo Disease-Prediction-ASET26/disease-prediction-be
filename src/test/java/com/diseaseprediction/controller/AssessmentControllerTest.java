@@ -6,9 +6,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.diseaseprediction.controller.dto.DiseasePredictionDto;
-import com.diseaseprediction.controller.dto.ExplanationDto;
-import com.diseaseprediction.controller.dto.PredictionResultDto;
+import com.diseaseprediction.api.model.DiseasePrediction;
+import com.diseaseprediction.api.model.Explanation;
+import com.diseaseprediction.api.model.PredictionResult;
 import com.diseaseprediction.service.assessment.AssessmentApiService;
 import com.diseaseprediction.service.prediction.PredictionClient;
 
@@ -20,15 +20,18 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
  * MDD Iteration 2 — Step 5 validation. Verifies the controller slice against the API contract: a
- * valid request yields 200 with a prediction result body; an empty request yields 400. The {@link
- * PredictionClient} is mocked so the backend slice is tested without a live Python service.
+ * valid request yields 200 with a prediction result body; an empty request yields 400. The 400 now
+ * originates in {@link AssessmentApiService} (via {@code InvalidAssessmentRequestException} mapped
+ * to {@code HttpStatus.BAD_REQUEST}) rather than from an inline controller check; the external
+ * assertions below are unchanged. The {@link PredictionClient} is mocked so the backend slice is
+ * tested without a live Python service.
  */
 @WebMvcTest(AssessmentController.class)
 @Import({AssessmentApiService.class, AssessmentControllerTest.MockConfig.class})
@@ -40,17 +43,24 @@ class AssessmentControllerTest {
         @Bean
         PredictionClient predictionClient() {
             PredictionClient client = org.mockito.Mockito.mock(PredictionClient.class);
-            PredictionResultDto stub =
-                    new PredictionResultDto(
-                            UUID.randomUUID(),
-                            Instant.parse("2026-10-31T12:00:00Z"),
-                            "This is not a medical diagnosis",
-                            List.of(
-                                    new DiseasePredictionDto(
-                                            1,
-                                            0.82,
-                                            "Common Cold",
-                                            new ExplanationDto("stub", Map.of("cough", 0.5)))));
+            PredictionResult stub =
+                    new PredictionResult()
+                            .resultId(UUID.randomUUID())
+                            .generatedAt(OffsetDateTime.parse("2026-10-31T12:00:00Z"))
+                            .disclaimer("This is not a medical diagnosis")
+                            .predictions(
+                                    List.of(
+                                            new DiseasePrediction()
+                                                    .rank(1)
+                                                    .probability(0.82)
+                                                    .diseaseName("Common Cold")
+                                                    .explanation(
+                                                            new Explanation()
+                                                                    .summary("stub")
+                                                                    .contributionWeights(
+                                                                            Map.of(
+                                                                                    "cough",
+                                                                                    0.5)))));
             when(client.predict(any(), any())).thenReturn(stub);
             return client;
         }
