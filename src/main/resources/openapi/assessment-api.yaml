@@ -1,0 +1,169 @@
+openapi: 3.0.3
+info:
+  title: Disease Prediction Assessment API
+  description: >-
+    Contract-first definition of the Disease Prediction backend's own REST API.
+    This spec is the single source of truth for the request/response DTOs and the
+    Spring API interface used by the web layer (MDD Iteration 2 — UC1 Patient Triage,
+    FR-P1/FR-P2).
+  version: 1.0.0
+
+servers:
+  - url: /
+    description: Disease Prediction backend
+
+tags:
+  - name: Assessments
+    description: Patient assessment submission and triage.
+
+paths:
+  /api/assessments:
+    post:
+      tags:
+        - Assessments
+      summary: Submit an assessment and receive a prediction result.
+      description: >-
+        Receives an assessment payload (free text and/or symptom entries), runs a
+        lightweight emergency (red-flag) check, delegates prediction across the SOA
+        boundary and returns the result. The request must carry at least one symptom
+        signal (non-blank free text or at least one symptom entry); otherwise the
+        server responds with 400.
+      operationId: submitAssessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentRequest'
+      responses:
+        '200':
+          description: Assessment processed; prediction result returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentResponse'
+        '400':
+          description: >-
+            The payload carried no symptom signal (no free text and no symptom entries).
+
+components:
+  schemas:
+    AssessmentRequest:
+      type: object
+      description: >-
+        Inbound contract for POST /api/assessments. Platform-independent API model that
+        both the Java backend and the Python prediction service are derived from. A request
+        is only meaningful when it carries at least one signal to analyse: non-blank free
+        text or at least one symptom entry (enforced by the web layer, producing a 400 for
+        empty payloads).
+      properties:
+        patientId:
+          type: string
+          format: uuid
+          description: Identifier of the patient submitting the assessment.
+        freeText:
+          type: string
+          description: Raw patient free-text description (may be blank).
+        symptomEntries:
+          type: array
+          description: Structured, severity-weighted symptom entries.
+          items:
+            $ref: '#/components/schemas/SymptomEntry'
+
+    SymptomEntry:
+      type: object
+      description: >-
+        A single symptom entry in an assessment request. Mirrors the Python prediction
+        service SymptomEntryDTO across the SOA boundary.
+      properties:
+        rawText:
+          type: string
+          description: The raw symptom text as entered by the patient.
+        severity:
+          $ref: '#/components/schemas/Severity'
+        durationDays:
+          type: integer
+          format: int32
+          description: How long the symptom has been present, in days.
+        isMapped:
+          type: boolean
+          description: Whether the raw text has been mapped to a known symptom.
+
+    Severity:
+      type: string
+      description: Reported severity of a symptom.
+      enum:
+        - MILD
+        - MODERATE
+        - SEVERE
+
+    AssessmentResponse:
+      type: object
+      description: Outbound contract for POST /api/assessments.
+      properties:
+        assessmentId:
+          type: string
+          format: uuid
+          description: Identifier generated for this assessment.
+        emergencyDetected:
+          type: boolean
+          description: Whether a red-flag / emergency condition was detected.
+        result:
+          $ref: '#/components/schemas/PredictionResult'
+
+    PredictionResult:
+      type: object
+      description: >-
+        A prediction result. This is the value the prediction service returns and the
+        backend relays to the patient.
+      properties:
+        resultId:
+          type: string
+          format: uuid
+          description: Identifier of the prediction result.
+        generatedAt:
+          type: string
+          format: date-time
+          description: Instant the prediction was generated.
+        disclaimer:
+          type: string
+          description: Non-diagnostic disclaimer accompanying the result.
+        predictions:
+          type: array
+          description: Ranked disease predictions.
+          items:
+            $ref: '#/components/schemas/DiseasePrediction'
+
+    DiseasePrediction:
+      type: object
+      description: >-
+        A single ranked disease prediction (FR-P2: ranked likely diseases with a
+        calibrated probability score).
+      properties:
+        rank:
+          type: integer
+          format: int32
+          description: Rank of this prediction within the result (1 is most likely).
+        probability:
+          type: number
+          format: double
+          description: Calibrated probability score for this disease.
+        diseaseName:
+          type: string
+          description: Name of the predicted disease.
+        explanation:
+          $ref: '#/components/schemas/Explanation'
+
+    Explanation:
+      type: object
+      description: A prediction explanation.
+      properties:
+        summary:
+          type: string
+          description: Human-readable summary of why this disease was predicted.
+        contributionWeights:
+          type: object
+          description: Per-feature contribution weights keyed by feature name.
+          additionalProperties:
+            type: number
+            format: double

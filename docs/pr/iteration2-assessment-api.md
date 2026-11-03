@@ -26,8 +26,8 @@ Net-new, non-destructive: the existing domain skeletons and the pre-existing `As
   stub returns a contract-shaped result so the backend is testable before the live Python
   `POST /predict` exists. Follow-up: `HttpPredictionClient` (Spring `RestClient`).
 - **Tests** — `@WebMvcTest AssessmentControllerTest` with a mocked `PredictionClient`.
-- **Docs** — Iteration 2 model diagrams under `docs/diagrams/iteration2/` (class, sequence,
-  baseline-vs-refined) as `.mmd` sources + rendered `.png`.
+- **Docs** — Iteration 2 model diagrams (class, sequence, baseline-vs-refined) live in the
+  `disease-prediction-docs` repo under `diagrams/mdd/iteration2/` (kept out of the code repo).
 
 ## API contract
 
