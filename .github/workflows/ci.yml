@@ -30,7 +30,7 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
-    - uses: Disease-Prediction-ASET26/disease-prediction-ci/actions/validate-workflows@b4745f8ca8fcb941ad515f24b0c202bad5d321c8 # v1.0.0
+    - uses: Disease-Prediction-ASET26/disease-prediction-ci/actions/validate-workflows@9e5366ee9e7f72e2103c04718e70bef8b5d40f79 # v1.0.2
   secret-scan:
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
       && github.event.action != 'closed' }}
