@@ -151,7 +151,7 @@ jobs:
       && github.event.action != 'closed' }}
     needs:
     - build
-    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/dependency-scan.yml@95b512aab16b1a9012d42d705bbddfd36e8e02f3 # Maven suppression forwarding
+    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/dependency-scan.yml@ca263aa1033fd55a52df5afd689c4a4eb9d1f7e4 # Maven suppression forwarding
     permissions:
       contents: read
       packages: read
