@@ -210,7 +210,7 @@ jobs:
           echo "::error::PRs into main must come from this repository's develop branch."
           exit 1
         fi
-    - uses: Disease-Prediction-ASET26/disease-prediction-ci/actions/ci-summary@b4745f8ca8fcb941ad515f24b0c202bad5d321c8 # v1.0.0
+    - uses: Disease-Prediction-ASET26/disease-prediction-ci/actions/ci-summary@9e5366ee9e7f72e2103c04718e70bef8b5d40f79 # v1.0.2
       with:
         needs: ${{ toJSON(needs) }}
         disabled: '{"lint": "Add the Java lint configuration and its command.", "unit-test": "Add a real unit test
