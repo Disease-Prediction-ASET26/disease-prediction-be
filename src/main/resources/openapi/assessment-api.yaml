@@ -151,6 +151,17 @@ components:
         diseaseName:
           type: string
           description: Name of the predicted disease.
+        description:
+          type: string
+          description: Short description of the disease (FR-P3), if known.
+        precautions:
+          type: array
+          description: Recommended precautions for the disease (FR-P3).
+          items:
+            type: string
+        specialty:
+          type: string
+          description: Medical specialty recommended for this disease (FR-P4).
         explanation:
           $ref: '#/components/schemas/Explanation'
 
