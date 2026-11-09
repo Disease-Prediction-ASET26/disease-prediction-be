@@ -33,7 +33,8 @@ enforced yet.
 Needs Docker (Docker Desktop, OrbStack, or Colima). The database is defined in `compose.yaml`.
 
 ```bash
-cp .env.example .env       # once; then set POSTGRES_PASSWORD in .env
+cp .env.example .env       # once; then set POSTGRES_PASSWORD and DATA_ENCRYPTION_KEY in .env
+openssl rand -base64 32    # generates a value for DATA_ENCRYPTION_KEY
 docker compose up -d       # start PostgreSQL 18 on localhost:5433
 docker compose ps          # STATUS should show "healthy"
 docker compose down        # stop (data is kept)
@@ -43,6 +44,11 @@ docker compose down -v     # stop and delete all local data
 Connect: host `localhost`, port `5433`, database and user `disease_prediction`, password from
 `.env`. Port 5433 is used so it doesn't clash with a PostgreSQL already installed on 5432.
 `.env` holds your local password and is gitignored, so never commit it.
+
+**Field-level encryption.** Personal data (`users.full_name`, `patients.date_of_birth`) is
+stored encrypted with AES-256-GCM, using the key in `DATA_ENCRYPTION_KEY`. The backend refuses to
+start without a valid key. If you lose or change the key, existing encrypted values can no longer
+be read; for local development, `docker compose down -v` resets the database.
 
 ## Develop
 

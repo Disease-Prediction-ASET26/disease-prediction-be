@@ -1,8 +1,10 @@
 package com.diseaseprediction.domain;
 
 import com.diseaseprediction.domain.enums.UserRole;
+import com.diseaseprediction.persistence.EncryptedStringConverter;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.DiscriminatorColumn;
 import jakarta.persistence.DiscriminatorType;
 import jakarta.persistence.Entity;
@@ -40,7 +42,9 @@ public abstract class User {
     @Column(nullable = false, length = 320)
     private String email;
 
-    @Column(name = "full_name", nullable = false)
+    /** Personal data: stored encrypted (Flyway V2), readable only with the application key. */
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "full_name", nullable = false, length = 2048)
     private String fullName;
 
     /**

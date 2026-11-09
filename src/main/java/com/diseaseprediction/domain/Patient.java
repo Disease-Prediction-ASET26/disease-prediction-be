@@ -1,9 +1,11 @@
 package com.diseaseprediction.domain;
 
 import com.diseaseprediction.domain.enums.UserRole;
+import com.diseaseprediction.persistence.EncryptedLocalDateConverter;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.OneToMany;
@@ -22,7 +24,9 @@ import java.util.List;
 @PrimaryKeyJoinColumn(name = "user_id")
 @DiscriminatorValue("PATIENT")
 public class Patient extends User {
-    @Column(name = "date_of_birth")
+    /** Personal data: stored encrypted (Flyway V2), readable only with the application key. */
+    @Convert(converter = EncryptedLocalDateConverter.class)
+    @Column(name = "date_of_birth", length = 128)
     private LocalDate dateOfBirth;
 
     /**

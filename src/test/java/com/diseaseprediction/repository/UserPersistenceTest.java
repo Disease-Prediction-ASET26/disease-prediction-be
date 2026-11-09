@@ -10,6 +10,7 @@ import com.diseaseprediction.domain.Doctor;
 import com.diseaseprediction.domain.Patient;
 import com.diseaseprediction.domain.User;
 import com.diseaseprediction.domain.enums.UserRole;
+import com.diseaseprediction.security.FieldEncryptor;
 
 import jakarta.persistence.EntityManager;
 
@@ -24,13 +25,14 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * Validates MDD Iteration 5 against a real PostgreSQL: the Flyway V1 schema, JOINED inheritance
- * with the role discriminator, unique keys, cascade deletion and the consent history. Hibernate
- * runs with ddl-auto=validate, so the context only starts if the entities match the migration.
+ * Validates MDD Iteration 5 against a real PostgreSQL: the Flyway V1 + V2 schema, JOINED
+ * inheritance with the role discriminator, unique keys, cascade deletion, the consent history and
+ * field-level encryption of personal data. Hibernate runs with ddl-auto=validate, so the context
+ * only starts if the entities match the migration.
  */
 @DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, FieldEncryptor.class})
 class UserPersistenceTest {
 
     @Autowired private UserRepository userRepository;
@@ -151,6 +153,38 @@ class UserPersistenceTest {
         assertThat(countRows("users", "id", id)).isZero();
         assertThat(countRows("patients", "user_id", id)).isZero();
         assertThat(countRows("consents", "patient_id", id)).isZero();
+    }
+
+    @Test
+    void personalDataIsEncryptedInTheDatabaseAndReadableThroughTheEntity() {
+        Patient patient =
+                patientRepository.saveAndFlush(
+                        new Patient(
+                                "kc-encrypted",
+                                "e@example.com",
+                                "Elena Ionescu",
+                                LocalDate.of(1985, 3, 14)));
+        entityManager.clear();
+
+        String rawName = rawColumn("users", "full_name", "id", patient.getId());
+        String rawBirthDate = rawColumn("patients", "date_of_birth", "user_id", patient.getId());
+
+        assertThat(rawName).startsWith("v1:").doesNotContain("Elena");
+        assertThat(rawBirthDate).startsWith("v1:").doesNotContain("1985");
+
+        Patient reloaded = patientRepository.findById(patient.getId()).orElseThrow();
+        assertThat(reloaded.getFullName()).isEqualTo("Elena Ionescu");
+        assertThat(reloaded.getDateOfBirth()).isEqualTo(LocalDate.of(1985, 3, 14));
+    }
+
+    private String rawColumn(String table, String column, String idColumn, UUID id) {
+        return (String)
+                entityManager
+                        .createNativeQuery(
+                                "SELECT " + column + " FROM " + table + " WHERE " + idColumn
+                                        + " = :id")
+                        .setParameter("id", id)
+                        .getSingleResult();
     }
 
     private String roleInUsersTable(UUID id) {
