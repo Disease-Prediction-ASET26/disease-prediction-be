@@ -11,7 +11,8 @@ conventions below. See `README.md` for the human-facing version.
 
 ## Commands
 
-- Build + test: `./mvnw clean test`
+- Build + test: `./mvnw clean test` (needs Docker running: database tests use Testcontainers).
+  Writes the JaCoCo coverage report to `target/site/jacoco/`.
 - Run locally: `./mvnw spring-boot:run` (http://localhost:8080)
 - Format: `./mvnw spotless:apply` (google-java-format, AOSP style)
 - Regenerate API code from the spec: `./mvnw generate-sources`

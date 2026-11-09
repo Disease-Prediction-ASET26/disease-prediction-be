@@ -9,10 +9,24 @@ and DTOs are generated from them at build time.
 Needs **JDK 25**. Use the Maven wrapper (`./mvnw`, or `mvnw.cmd` on Windows) — no local Maven needed.
 
 ```bash
-./mvnw spring-boot:run     # starts on http://localhost:8080
-./mvnw clean test          # build + run tests
+./mvnw spring-boot:run     # starts on http://localhost:8080 (needs the local database, below)
+./mvnw clean test          # build + run tests + coverage report
 ./mvnw clean package       # build the runnable jar
 ```
+
+## Tests and coverage
+
+The tests need **Docker running**: database tests use [Testcontainers](https://testcontainers.com)
+to start a throwaway PostgreSQL 18, run the Flyway migrations on it, and delete it afterwards.
+They don't touch your local development database.
+
+`./mvnw clean test` (or `./mvnw verify`) also writes a **JaCoCo coverage report**:
+
+- `target/site/jacoco/index.html`: open in a browser for coverage per package, class and line.
+- `target/site/jacoco/jacoco.xml`: the same data for tools such as SonarQube.
+
+Classes generated from the OpenAPI spec are excluded from the report. No minimum coverage is
+enforced yet.
 
 ## Local database (PostgreSQL in Docker)
 
