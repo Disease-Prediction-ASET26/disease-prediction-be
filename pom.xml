@@ -152,7 +152,11 @@
                 <configuration>
                     <java>
                         <googleJavaFormat>
-                            <version>1.28.0</version>
+                            <!--
+                                1.30.0+ is required to run on JDK 25 (the project's Java version).
+                                1.37.0 is not yet supported by spotless-maven-plugin 3.10.4/3.11.0.
+                            -->
+                            <version>1.36.1</version>
                             <style>AOSP</style>
                             <reorderImports>true</reorderImports>
                         </googleJavaFormat>

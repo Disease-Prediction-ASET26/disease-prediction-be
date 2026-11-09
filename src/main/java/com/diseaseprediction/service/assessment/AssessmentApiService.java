@@ -21,9 +21,9 @@ import java.util.UUID;
  * prediction to the {@link PredictionClient} across the SOA boundary.
  *
  * <p>This service is the seam between the OpenAPI-generated API DTOs ({@link AssessmentRequest} /
- * {@link AssessmentResponse} / {@link PredictionResult}) and the domain model. The DTO&lt;-&gt;domain
- * boundary deliberately lives here so MapStruct mappers can later be slotted in without touching
- * the generated DTOs or the controller.
+ * {@link AssessmentResponse} / {@link PredictionResult}) and the domain model. The
+ * DTO&lt;-&gt;domain boundary deliberately lives here so MapStruct mappers can later be slotted in
+ * without touching the generated DTOs or the controller.
  *
  * <p>Named {@code AssessmentApiService} to coexist with the pre-existing domain-coupled {@code
  * AssessmentService}; this class is the web-layer orchestrator introduced by Iteration 2.
