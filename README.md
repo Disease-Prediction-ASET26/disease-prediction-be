@@ -14,6 +14,22 @@ Needs **JDK 25**. Use the Maven wrapper (`./mvnw`, or `mvnw.cmd` on Windows) —
 ./mvnw clean package       # build the runnable jar
 ```
 
+## Local database (PostgreSQL in Docker)
+
+Needs Docker (Docker Desktop, OrbStack, or Colima). The database is defined in `compose.yaml`.
+
+```bash
+cp .env.example .env       # once; then set POSTGRES_PASSWORD in .env
+docker compose up -d       # start PostgreSQL 18 on localhost:5433
+docker compose ps          # STATUS should show "healthy"
+docker compose down        # stop (data is kept)
+docker compose down -v     # stop and delete all local data
+```
+
+Connect: host `localhost`, port `5433`, database and user `disease_prediction`, password from
+`.env`. Port 5433 is used so it doesn't clash with a PostgreSQL already installed on 5432.
+`.env` holds your local password and is gitignored, so never commit it.
+
 ## Develop
 
 1. Branch off `develop` (e.g. `feat/my-change`).
