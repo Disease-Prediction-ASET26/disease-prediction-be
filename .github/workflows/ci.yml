@@ -204,7 +204,7 @@ jobs:
     - integration-test
     - sonarqube
     - owasp
-    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/container.yml@5e626d4cfb826c575096524f677a9e23e5017217 # GitOps dev digest pull requests
+    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/container.yml@ef64928af0e4c0998741586d441c4871c2dbe12b # expose registry digest output
     permissions:
       contents: read
       packages: write
