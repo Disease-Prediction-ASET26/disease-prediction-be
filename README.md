@@ -21,6 +21,21 @@ this repository. The `prod` profile is for local image checks; production
 deployment uses the scanned image digest, cluster secrets, and managed
 database configuration.
 
+## Prediction service
+
+`POST /api/assessments` calls the Python service at
+`PREDICTION_SERVICE_BASE_URL` (default `http://localhost:8000`) using
+`POST /predict`. The backend combines free text with checklist symptoms and
+their severity and duration, then maps the AI response to the frontend API
+contract. It requests the top five results. The HTTP client uses a 2-second
+connect timeout and a 90-second response timeout.
+
+Red-flag assessments return immediately with `emergencyDetected: true` and no
+prediction result. If the service cannot recognise any symptom, the backend
+returns 422. Network failures return 503; other prediction-service errors
+return 502. Set `PREDICTION_SERVICE_BASE_URL=http://ai:8000` in Kubernetes or
+use the matching service name in the Docker Compose profile.
+
 ## Tests and coverage
 
 The tests need **Docker running**: database tests use [Testcontainers](https://testcontainers.com)
