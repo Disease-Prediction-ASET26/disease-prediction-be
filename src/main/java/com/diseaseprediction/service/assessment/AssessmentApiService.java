@@ -55,10 +55,17 @@ public class AssessmentApiService {
     public AssessmentResponse runAssessment(AssessmentRequest request) {
         if (request == null || !hasAnySymptomSignal(request)) {
             throw new InvalidAssessmentRequestException(
-                    "Assessment must include free text or at least one symptom entry.");
+                    "Assessment must include free text or at least one symptom entry with text.");
         }
 
         boolean emergencyDetected = detectEmergency(request);
+
+        if (emergencyDetected) {
+            return new AssessmentResponse()
+                    .assessmentId(UUID.randomUUID())
+                    .emergencyDetected(true)
+                    .result(null);
+        }
 
         PredictionResult result =
                 predictionClient.predict(request.getFreeText(), request.getSymptomEntries());
@@ -71,12 +78,18 @@ public class AssessmentApiService {
 
     /**
      * A request carries a symptom signal when it has either non-blank free text or at least one
-     * symptom entry. The validation lives in the service so controllers remain thin pass-throughs.
+     * non-blank symptom entry. The validation lives in the service so controllers remain thin.
      */
     private static boolean hasAnySymptomSignal(AssessmentRequest request) {
         boolean hasText = request.getFreeText() != null && !request.getFreeText().isBlank();
         boolean hasEntries =
-                request.getSymptomEntries() != null && !request.getSymptomEntries().isEmpty();
+                request.getSymptomEntries() != null
+                        && request.getSymptomEntries().stream()
+                                .anyMatch(
+                                        entry ->
+                                                entry != null
+                                                        && entry.getRawText() != null
+                                                        && !entry.getRawText().isBlank());
         return hasText || hasEntries;
     }
 

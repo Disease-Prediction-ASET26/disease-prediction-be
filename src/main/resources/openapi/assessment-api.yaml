@@ -26,7 +26,7 @@ paths:
         Receives an assessment payload (free text and/or symptom entries), runs a
         lightweight emergency (red-flag) check, delegates prediction across the SOA
         boundary and returns the result. The request must carry at least one symptom
-        signal (non-blank free text or at least one symptom entry); otherwise the
+        signal (non-blank free text or at least one non-blank symptom entry); otherwise the
         server responds with 400.
       operationId: submitAssessment
       requestBody:
@@ -44,7 +44,13 @@ paths:
                 $ref: '#/components/schemas/AssessmentResponse'
         '400':
           description: >-
-            The payload carried no symptom signal (no free text and no symptom entries).
+            The payload carried no symptom signal (no free text and no non-blank symptom entries).
+        '422':
+          description: The prediction service could not identify a supported symptom.
+        '502':
+          description: The prediction service returned an invalid response or an error.
+        '503':
+          description: The prediction service is temporarily unavailable.
 
 components:
   schemas:
@@ -54,7 +60,7 @@ components:
         Inbound contract for POST /api/assessments. Platform-independent API model that
         both the Java backend and the Python prediction service are derived from. A request
         is only meaningful when it carries at least one signal to analyse: non-blank free
-        text or at least one symptom entry (enforced by the web layer, producing a 400 for
+        text or at least one non-blank symptom entry (enforced by the web layer, producing a 400 for
         empty payloads).
       properties:
         patientId:
@@ -110,6 +116,7 @@ components:
           description: Whether a red-flag / emergency condition was detected.
         result:
           $ref: '#/components/schemas/PredictionResult'
+          nullable: true
 
     PredictionResult:
       type: object
