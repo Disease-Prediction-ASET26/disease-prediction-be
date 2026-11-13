@@ -14,6 +14,13 @@ Needs **JDK 25**. Use the Maven wrapper (`./mvnw`, or `mvnw.cmd` on Windows) —
 ./mvnw clean package       # build the runnable jar
 ```
 
+For the full AI, backend, frontend, and database stack, use the sibling
+[`disease-prediction-docker`](../disease-prediction-docker) repository. Its
+`local`, `dev`, and `prod` Compose profiles build the matching Dockerfile from
+this repository. The `prod` profile is for local image checks; production
+deployment uses the scanned image digest, cluster secrets, and managed
+database configuration.
+
 ## Tests and coverage
 
 The tests need **Docker running**: database tests use [Testcontainers](https://testcontainers.com)
