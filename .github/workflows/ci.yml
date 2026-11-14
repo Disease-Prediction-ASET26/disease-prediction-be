@@ -18,7 +18,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
   workflow-lint:
@@ -204,7 +204,7 @@ jobs:
     - integration-test
     - sonarqube
     - owasp
-    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/container.yml@9e6e3f6a1f5e78832ed199c2639db4f9395972df # multi-platform publisher
+    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/container.yml@f85ec3d7dc9b79e28b68822e5045823b46961ef5 # separate registry queues
     permissions:
       contents: read
       packages: write
