@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1.7
+ARG MAVEN_IMAGE=maven:3.9.12-eclipse-temurin-25-alpine@sha256:91fbbf32cc5076b6142ed98405f3a1a21e102d876eafa5eaf359b5591e8e3fd8
+ARG JRE_IMAGE=eclipse-temurin:25.0.5_8-jre-alpine-3.24@sha256:e1898fd6a11fc965a994d8ace186fd3585aeb636cf8f05f47a723fcfee0b0918
+FROM ${MAVEN_IMAGE} AS build
+WORKDIR /workspace
+COPY .mvn .mvn
+COPY mvnw pom.xml ./
+RUN chmod +x mvnw
+RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -ntp dependency:go-offline
+COPY src ./src
+RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -ntp -DskipTests package \
+    && java -Djarmode=tools -jar target/disease-prediction-be-0.0.1-SNAPSHOT.jar extract --layers --destination /layers
+
+FROM ${JRE_IMAGE} AS runtime
+WORKDIR /app
+RUN addgroup -S -g 10001 app \
+    && adduser -S -u 10001 -G app -h /home/app app \
+    && mkdir -p /tmp \
+    && chown 10001:10001 /tmp
+COPY --from=build --chown=10001:10001 /layers/dependencies/ ./
+COPY --from=build --chown=10001:10001 /layers/spring-boot-loader/ ./
+COPY --from=build --chown=10001:10001 /layers/snapshot-dependencies/ ./
+COPY --from=build --chown=10001:10001 /layers/application/ ./
+USER 10001:10001
+EXPOSE 8080
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "disease-prediction-be-0.0.1-SNAPSHOT.jar"]

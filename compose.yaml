@@ -1,0 +1,32 @@
+# Local development database for the backend.
+#
+#   cp .env.example .env      # once, then set a password in .env
+#   docker compose up -d      # start PostgreSQL
+#   docker compose down       # stop it (data is kept in the named volume)
+#   docker compose down -v    # stop it AND delete all local data
+#
+# For local development only. Production databases are not configured here.
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: disease-prediction-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-disease_prediction}
+      POSTGRES_USER: ${POSTGRES_USER:-disease_prediction}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example to .env)}
+    ports:
+      # Bound to localhost only, so the database is not reachable from the network.
+      # Host port defaults to 5433 to avoid clashing with a locally installed PostgreSQL on 5432.
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      # PostgreSQL 18+ images keep their data under /var/lib/postgresql.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:

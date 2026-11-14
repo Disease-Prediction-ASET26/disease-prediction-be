@@ -22,12 +22,13 @@ Net-new, non-destructive: the existing domain skeletons and the pre-existing `As
 - **Orchestrator** — `AssessmentApiService.runAssessment()`: emergency check runs **before**
   prediction, so an emergency surfaces even if prediction fails. Named `AssessmentApiService` to
   coexist with the pre-existing domain-coupled `AssessmentService` rather than overwriting it.
-- **SOA boundary** — `PredictionClient` (interface / port) + `StubPredictionClient` (adapter). The
-  stub returns a contract-shaped result so the backend is testable before the live Python
-  `POST /predict` exists. Follow-up: `HttpPredictionClient` (Spring `RestClient`).
+- **SOA boundary** — `PredictionClient` (interface / port) + `HttpPredictionClient` adapter. The
+  adapter calls the Python `POST /predict`, converts checklist symptoms to text, and maps the
+  snake-case AI response to the backend contract. It uses a 2-second connect timeout and a
+  90-second response timeout.
 - **Tests** — `@WebMvcTest AssessmentControllerTest` with a mocked `PredictionClient`.
-- **Docs** — Iteration 2 model diagrams under `docs/diagrams/iteration2/` (class, sequence,
-  baseline-vs-refined) as `.mmd` sources + rendered `.png`.
+- **Docs** — Iteration 2 model diagrams (class, sequence, baseline-vs-refined) live in the
+  `disease-prediction-docs` repo under `diagrams/mdd/iteration2/` (kept out of the code repo).
 
 ## API contract
 
@@ -61,7 +62,8 @@ Response (200):
 }
 ```
 
-400 — empty/invalid payload.
+400 — empty/invalid payload. 422 — no supported symptom could be identified. 502/503 — the
+prediction service returned an error or could not be reached.
 
 ## How it was tested
 
@@ -81,8 +83,8 @@ Response (200):
 - Branch created from the latest `origin/develop`; per the repo's CI rule, this PR targets
   `develop` (PRs into `main` must come from `develop`).
 
-## Follow-ups (Iteration 2, Step 6)
+## Follow-up
 
-- Implement `HttpPredictionClient` calling the Python `POST /predict`, replacing `StubPredictionClient`.
-- Decide prediction-service timeout/fallback behaviour and whether `GET /api/assessments/{id}` is
-  needed to retrieve a stored result.
+The client returns the five highest-ranked predictions. Emergency assessments skip the model and
+return `result: null` so the safety response remains available if the model is not ready. Whether
+`GET /api/assessments/{id}` is needed to retrieve a stored result remains open.

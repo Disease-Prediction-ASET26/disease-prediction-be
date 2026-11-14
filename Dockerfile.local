@@ -1,0 +1,21 @@
+# syntax=docker/dockerfile:1.7
+ARG MAVEN_IMAGE=maven:3.9.12-eclipse-temurin-25-alpine@sha256:91fbbf32cc5076b6142ed98405f3a1a21e102d876eafa5eaf359b5591e8e3fd8
+FROM ${MAVEN_IMAGE} AS local
+ARG LOCAL_UID=1000
+ARG LOCAL_GID=1000
+WORKDIR /workspace
+ENV HOME=/home/app \
+    MAVEN_CONFIG=/home/app/.m2
+RUN addgroup -g ${LOCAL_GID} -S app \
+    && adduser -u ${LOCAL_UID} -S -G app -h /home/app app \
+    && mkdir -p /home/app/.m2 \
+    && chown -R app:app /workspace /home/app
+COPY .mvn .mvn
+COPY mvnw pom.xml ./
+RUN chmod +x mvnw
+RUN --mount=type=cache,target=/home/app/.m2,uid=${LOCAL_UID},gid=${LOCAL_GID} ./mvnw -B -ntp dependency:go-offline
+COPY . .
+RUN chown -R app:app /workspace
+USER app
+EXPOSE 8080
+CMD ["./mvnw", "-B", "-ntp", "spring-boot:run"]

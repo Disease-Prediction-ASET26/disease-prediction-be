@@ -1,7 +1,7 @@
 package com.diseaseprediction.service.prediction;
 
-import com.diseaseprediction.controller.dto.PredictionResultDto;
-import com.diseaseprediction.controller.dto.SymptomEntryDto;
+import com.diseaseprediction.api.model.PredictionResult;
+import com.diseaseprediction.api.model.SymptomEntry;
 
 import java.util.List;
 
@@ -21,5 +21,5 @@ public interface PredictionClient {
      * @param symptomEntries structured, severity-weighted symptom entries
      * @return the ranked prediction result produced by the prediction service
      */
-    PredictionResultDto predict(String freeText, List<SymptomEntryDto> symptomEntries);
+    PredictionResult predict(String freeText, List<SymptomEntry> symptomEntries);
 }

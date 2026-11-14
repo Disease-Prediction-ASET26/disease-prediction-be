@@ -1,0 +1,12 @@
+.git
+.github
+.idea
+.vscode
+.cache
+.mvn/wrapper/maven-wrapper.jar
+target
+*.iml
+.env
+.env.*
+!.env.example
+*.log
