@@ -204,7 +204,7 @@ jobs:
     - integration-test
     - sonarqube
     - owasp
-    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/container.yml@1f3c567c6e3f5936c24bed6eaf7e4a4b04145937 # multi-platform publisher
+    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/container.yml@9e6e3f6a1f5e78832ed199c2639db4f9395972df # multi-platform publisher
     permissions:
       contents: read
       packages: write
