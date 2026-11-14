@@ -119,7 +119,7 @@
             <plugin>
                 <groupId>org.openapitools</groupId>
                 <artifactId>openapi-generator-maven-plugin</artifactId>
-                <version>7.26.0</version>
+                <version>7.27.0</version>
                 <executions>
                     <execution>
                         <id>generate-assessment-api</id>
@@ -179,7 +179,7 @@
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>3.10.4</version>
+                <version>3.11.0</version>
                 <configuration>
                     <java>
                         <googleJavaFormat>
