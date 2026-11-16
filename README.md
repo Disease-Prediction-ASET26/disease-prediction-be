@@ -14,12 +14,76 @@ Needs **JDK 25**. Use the Maven wrapper (`./mvnw`, or `mvnw.cmd` on Windows) —
 ./mvnw clean package       # build the runnable jar
 ```
 
-For the full AI, backend, frontend, and database stack, use the sibling
-[`disease-prediction-docker`](../disease-prediction-docker) repository. Its
-`local`, `dev`, and `prod` Compose profiles build the matching Dockerfile from
-this repository. The `prod` profile is for local image checks; production
-deployment uses the scanned image digest, cluster secrets, and managed
-database configuration.
+## Docker
+
+The backend needs PostgreSQL and a 32-byte Base64 `DATA_ENCRYPTION_KEY` to
+start. It also needs the AI service for prediction requests. Docker image
+builds skip tests; run the backend tests separately as described below.
+
+| File | Use | Runtime |
+| --- | --- | --- |
+| `Dockerfile.local` | Run Maven and the backend for local development. | JDK 25 |
+| `Dockerfile.dev` | Build a layered JAR and run a dev image. | JDK 25 |
+| `Dockerfile.prod` | Build the same layered JAR for production. | JRE 25 |
+
+All three listen on port `8080` in the container. The local image starts Maven;
+the dev and production images start the packaged JAR as a non-root user.
+
+### Run the full stack
+
+Follow the [shared Docker setup](https://github.com/Disease-Prediction-ASET26/disease-prediction-docker)
+to configure local secrets, PostgreSQL, and the AI model files. Keep the app
+repositories as sibling directories. From `disease-prediction-docker`, run:
+
+```bash
+docker compose --profile local up --build
+```
+
+The backend is at `http://localhost:8080`. Compose mounts this repository at
+`/workspace` and uses `Dockerfile.local`. Restart the backend container after
+source changes. To check the packaged images, use the `dev` or `prod` profile:
+
+```bash
+docker compose --profile dev up --build
+docker compose --profile prod up --build
+```
+
+Run one profile at a time. The backend ports are `18080` for dev and `28080`
+for production. Run `docker compose --profile local down` to stop the local
+stack; use the matching profile for the other stacks. Data is kept. The
+production profile is a local image check, not a cluster deployment.
+
+### Build and run a backend image
+
+From this repository, build the image you want to check:
+
+```bash
+docker build -f Dockerfile.local -t disease-prediction-be:local .
+docker build -f Dockerfile.dev -t disease-prediction-be:dev .
+docker build -f Dockerfile.prod -t disease-prediction-be:prod .
+```
+
+To run the dev image with this repository's local PostgreSQL, first configure
+`.env` and start the database as described in [Local database](#local-database-postgresql-in-docker).
+Then run:
+
+```bash
+docker run --rm --name backend-check \
+  --network disease-prediction-be_default \
+  --env-file .env \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/disease_prediction \
+  -p 127.0.0.1:18080:8080 disease-prediction-be:dev
+```
+
+This example uses the default database name and Compose project name. Adjust
+the URL and network if you changed them. Stop the container with Ctrl+C. The
+database stays running until `docker compose down`. Replace `:dev` with `:prod`
+to check the production image. For predictions, connect an AI service and set
+`PREDICTION_SERVICE_BASE_URL` to its address on the same network, or use the
+full stack above.
+
+Backend tests use Testcontainers and need the host Docker daemon. Run them from
+this repository on the host as described in [Tests and coverage](#tests-and-coverage).
 
 ## Prediction service
 
