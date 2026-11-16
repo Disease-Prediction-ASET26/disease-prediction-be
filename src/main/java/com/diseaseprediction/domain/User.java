@@ -25,7 +25,8 @@ import java.util.UUID;
 /**
  * A user of the system (MDD Iteration 5). Mapped with JOINED inheritance: shared fields live in
  * {@code users}, each subclass has its own table sharing this id. Passwords and login are handled
- * by the identity provider (Keycloak); {@code identityId} links this row to that account.
+ * by the identity provider (Hanko); {@code identityId} holds the Hanko user id (the session token's
+ * {@code sub} claim).
  */
 @Entity
 @Table(name = "users")
@@ -78,6 +79,17 @@ public abstract class User {
 
     public String getEmail() {
         return email;
+    }
+
+    /**
+     * Keeps the stored copy in line with the identity provider, which owns the address. Only called
+     * with a verified address from the session token.
+     */
+    public void changeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("email must not be blank");
+        }
+        this.email = email;
     }
 
     public String getFullName() {

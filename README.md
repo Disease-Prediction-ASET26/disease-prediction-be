@@ -136,6 +136,51 @@ stored encrypted with AES-256-GCM, using the key in `DATA_ENCRYPTION_KEY`. The b
 start without a valid key. If you lose or change the key, existing encrypted values can no longer
 be read; for local development, `docker compose down -v` resets the database.
 
+## Authentication (Hanko)
+
+Every `/api/**` request needs a Hanko session token in `Authorization: Bearer <token>`
+(MDD Iteration 6). Without one the API answers 401. The backend:
+
+1. checks the token offline: RS256 signature against Hanko's JWKS, expiry, issuer and audience;
+2. asks Hanko (`POST /sessions/validate`) whether the session is still active, so logout and
+   revocation work before the token expires. The answer is reused for 60 seconds per session.
+   If Hanko cannot be reached the request is refused with 503;
+3. loads the user by the token's `sub` claim (`users.identity_id`) and uses the role stored in this
+   database. Roles never come from the token or the request.
+
+On the first login there is no profile yet: `GET /api/me` returns 404, then `POST /api/me` creates
+the patient profile and records consent. `POST /api/assessments` needs a patient with an active
+consent. Errors are `application/problem+json` with a `code` such as `profile-required` or
+`consent-required`.
+
+### Local Hanko
+
+`docker compose up -d` also starts a local Hanko (v3.1.0, the version deployed in the cluster),
+its own database, and [Mailpit](https://mailpit.axllent.org/), which catches the passcode emails.
+Set `HANKO_SECRETS_KEY` in `.env` first (`openssl rand -base64 32`).
+
+| Service | URL |
+| --- | --- |
+| Hanko public API | http://localhost:8100 |
+| Mailpit (passcode emails) | http://localhost:8025 |
+
+The backend defaults match this local Hanko (issuer `http://localhost:8100`, audience
+`pocket-doc-local`), so `./mvnw spring-boot:run` needs no extra settings. Signup is enabled,
+passkeys work for `http://localhost:5173`, and Google login is not configured locally.
+`docker compose down -v` deletes all local Hanko users. The configuration is in
+`local/hanko/config.yaml`.
+
+To use another Hanko instance, set these variables (the dev values are in the docs repo,
+`mdd/iteration6/README.md`, "Environments"):
+
+| Variable | Local default |
+| --- | --- |
+| `HANKO_ISSUER` | `http://localhost:8100` |
+| `HANKO_JWKS_URI` | `http://localhost:8100/.well-known/jwks.json` |
+| `HANKO_AUDIENCE` | `pocket-doc-local` |
+| `HANKO_API_URL` | `http://localhost:8100` |
+| `HANKO_SESSION_CHECK_TTL` | `60s` |
+
 ## Develop
 
 1. Branch off `develop` (e.g. `feat/my-change`).

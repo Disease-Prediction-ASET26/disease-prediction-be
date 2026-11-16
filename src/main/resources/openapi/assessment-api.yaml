@@ -16,6 +16,9 @@ tags:
   - name: Assessments
     description: Patient assessment submission and triage.
 
+security:
+  - bearerAuth: []
+
 paths:
   /api/assessments:
     post:
@@ -27,7 +30,8 @@ paths:
         lightweight emergency (red-flag) check, delegates prediction across the SOA
         boundary and returns the result. The request must carry at least one symptom
         signal (non-blank free text or at least one non-blank symptom entry); otherwise the
-        server responds with 400.
+        server responds with 400. Requires a signed-in patient with an active consent
+        (MDD Iteration 6); the patient is taken from the session token.
       operationId: submitAssessment
       requestBody:
         required: true
@@ -45,14 +49,31 @@ paths:
         '400':
           description: >-
             The payload carried no symptom signal (no free text and no non-blank symptom entries).
+        '401':
+          description: >-
+            Missing, invalid, expired or revoked session token (WWW-Authenticate: Bearer).
+        '403':
+          description: >-
+            Not a patient with an active consent: no profile yet
+            (urn:pocket-doc:problem:profile-required), consent not granted
+            (urn:pocket-doc:problem:consent-required) or another role
+            (urn:pocket-doc:problem:forbidden).
         '422':
           description: The prediction service could not identify a supported symptom.
         '502':
           description: The prediction service returned an invalid response or an error.
         '503':
-          description: The prediction service is temporarily unavailable.
+          description: >-
+            The prediction service is temporarily unavailable, or the identity service
+            could not confirm the session (urn:pocket-doc:problem:identity-unavailable).
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Hanko session token, sent as "Authorization: Bearer <token>".'
   schemas:
     AssessmentRequest:
       type: object
@@ -66,7 +87,10 @@ components:
         patientId:
           type: string
           format: uuid
-          description: Identifier of the patient submitting the assessment.
+          deprecated: true
+          description: >-
+            Ignored. The patient is taken from the session token (MDD Iteration 6); a
+            browser-supplied id is never trusted as proof of ownership.
         freeText:
           type: string
           description: Raw patient free-text description (may be blank).
