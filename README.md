@@ -144,11 +144,33 @@ Every `/api/**` request needs a Hanko session token in `Authorization: Bearer <t
 1. checks the token offline: RS256 signature against Hanko's JWKS, expiry, issuer and audience;
 2. asks Hanko (`POST /sessions/validate`) whether the session is still active, so logout and
    revocation work before the token expires. The answer is reused for 60 seconds per session.
-   If Hanko cannot be reached the request is refused with 503;
+   An uncached request is refused with 503 if Hanko cannot be reached. A cached active result
+   remains usable until its cache expiry;
 3. loads the user by the token's `sub` claim (`users.identity_id`) and uses the role stored in this
    database. Roles never come from the token or the request.
 
-On the first login there is no profile yet: `GET /api/me` returns 404, then `POST /api/me` creates
+The token must contain a verified primary email before the user can create or access a profile,
+change consent or submit an assessment. If the email is missing or unverified, the API responds
+with `email-not-verified`: 400 for onboarding and 403 for existing profile operations. Verify the
+email in Hanko and obtain a new session token before retrying. This also applies to accounts created
+during the development demo; their data is not deleted. The backend checks the claim in the token,
+not the current email state in Hanko. A previously issued token may contain stale claims until it
+expires or its session is revoked.
+
+An environment can quarantine known unsafe Hanko user IDs. A quarantined subject gets 403
+`account-quarantined` for application API requests, even if the email claim is verified. This
+does not disable the account or remove its Hanko credentials. Verification alone does not make
+credentials enrolled during an unsafe registration period trustworthy.
+
+To enable quarantine, set `HANKO_QUARANTINE_ENABLED=true` and set `HANKO_QUARANTINE_FILE` to
+a mounted secret file containing one canonical Hanko public user UUID per line. The backend
+fails to start if the file is missing, empty, malformed or over 128 KiB. The file is read at
+startup; restart all backend replicas after changing it. Protect the subject list and keep it
+out of Git and logs. Leave quarantine disabled in environments that do not need it. Recovery
+requires a separately verified identity and an operator-reviewed data migration; do not simply
+remove an old subject after email verification.
+
+On the first verified login there is no profile yet: `GET /api/me` returns 404, then `POST /api/me` creates
 the patient profile and records consent. `POST /api/assessments` needs a patient with an active
 consent. Errors are `application/problem+json` with a `code` such as `profile-required` or
 `consent-required`.

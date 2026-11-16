@@ -4,6 +4,8 @@ import com.diseaseprediction.repository.UserRepository;
 import com.diseaseprediction.security.hanko.HankoProperties;
 import com.diseaseprediction.security.hanko.HankoSessionCheckFilter;
 import com.diseaseprediction.security.hanko.HankoSessionClient;
+import com.diseaseprediction.security.hanko.IdentityQuarantineFilter;
+import com.diseaseprediction.security.hanko.IdentityQuarantineProperties;
 
 import jakarta.servlet.DispatcherType;
 
@@ -28,7 +30,7 @@ import java.time.Clock;
  * <p>Stateless: no HTTP session and no cookies, so CSRF protection is not needed.
  */
 @Configuration
-@EnableConfigurationProperties(HankoProperties.class)
+@EnableConfigurationProperties({HankoProperties.class, IdentityQuarantineProperties.class})
 public class SecurityConfig {
 
     @Bean
@@ -36,7 +38,8 @@ public class SecurityConfig {
             HttpSecurity http,
             UserRepository userRepository,
             HankoSessionClient hankoSessionClient,
-            HankoProperties hankoProperties)
+            HankoProperties hankoProperties,
+            IdentityQuarantineProperties quarantineProperties)
             throws Exception {
         RoleAuthoritiesConverter roleAuthoritiesConverter =
                 new RoleAuthoritiesConverter(userRepository);
@@ -82,7 +85,10 @@ public class SecurityConfig {
                                 exceptions
                                         .authenticationEntryPoint(entryPoint)
                                         .accessDeniedHandler(accessDeniedHandler))
-                .addFilterAfter(sessionCheckFilter, BearerTokenAuthenticationFilter.class);
+                .addFilterAfter(sessionCheckFilter, BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(
+                        new IdentityQuarantineFilter(quarantineProperties),
+                        BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 }

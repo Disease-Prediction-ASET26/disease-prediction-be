@@ -32,8 +32,9 @@ import java.time.Instant;
  * before the token expires.
  *
  * <p>Results are cached per {@code session_id} claim for {@code sessionCheckTtl}, never past the
- * token's expiry. If Hanko cannot be reached, the request is refused with 503: the API never falls
- * back to trusting the token alone. The session token is never logged.
+ * token's expiry. When a check is needed and Hanko cannot be reached, the request is refused with
+ * 503: the API never falls back to trusting the token alone. A cached result remains usable until
+ * it expires. The session token is never logged.
  */
 public class HankoSessionCheckFilter extends OncePerRequestFilter {
 

@@ -17,7 +17,6 @@ import com.diseaseprediction.repository.UserRepository;
 import com.diseaseprediction.security.AuthenticatedApiTest;
 import com.diseaseprediction.security.TestTokens;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -101,9 +100,6 @@ class ProfileApiIntegrationTest extends AuthenticatedApiTest {
                 .andExpect(jsonPath("$.code").value("consent-required"));
     }
 
-    @Disabled(
-            "TEMPORARY: email verification is off for the demo without a mail system (see"
-                    + " ProfileService.createPatientProfile). Re-enable before production signup.")
     @Test
     void onboardingNeedsAVerifiedEmail() throws Exception {
         perform(
@@ -111,22 +107,6 @@ class ProfileApiIntegrationTest extends AuthenticatedApiTest {
                         TestTokens.token().email("ana@example.com", false).build())
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("email-not-verified"));
-
-        perform(
-                        post("/api/me").contentType(MediaType.APPLICATION_JSON).content(ONBOARDING),
-                        TestTokens.token().withoutEmail().build())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("email-not-verified"));
-    }
-
-    /** TEMPORARY demo behaviour: replace with onboardingNeedsAVerifiedEmail when it is restored. */
-    @Test
-    void onboardingAcceptsAnUnverifiedEmailButStillNeedsOne() throws Exception {
-        perform(
-                        post("/api/me").contentType(MediaType.APPLICATION_JSON).content(ONBOARDING),
-                        TestTokens.token().email("ana@example.com", false).build())
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.email").value("ana@example.com"));
 
         perform(
                         post("/api/me").contentType(MediaType.APPLICATION_JSON).content(ONBOARDING),
@@ -200,6 +180,32 @@ class ProfileApiIntegrationTest extends AuthenticatedApiTest {
     }
 
     @Test
+    void existingProfileRequiresVerifiedEmailUntilANewVerifiedSession() throws Exception {
+        TestTokens session = TestTokens.token().email("ana@example.com", true);
+        onboard(session.build());
+        String unverified = session.email("ana@example.com", false).build();
+
+        perform(get("/api/me"), unverified)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("email-not-verified"));
+        perform(consent(false), unverified)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("email-not-verified"));
+        perform(assessment(), unverified)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("email-not-verified"));
+        perform(get("/api/me"), session.withoutEmail().build())
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("email-not-verified"));
+
+        // A newly issued Hanko token carries the verified claim after the user verifies their
+        // email.
+        perform(get("/api/me"), session.email("ana@example.com", true).build())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.consentGranted").value(true));
+    }
+
+    @Test
     void consentCanBeRevokedAndGrantedAgain() throws Exception {
         String token = TestTokens.token().build();
         onboard(token);
@@ -250,6 +256,28 @@ class ProfileApiIntegrationTest extends AuthenticatedApiTest {
         perform(consent(false), token).andExpect(status().isCreated());
 
         perform(assessment(), token)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("consent-required"));
+    }
+
+    @Test
+    void assessmentCannotUseAnotherPatientsConsent() throws Exception {
+        TestTokens consenting = TestTokens.token();
+        TestTokens revoked = TestTokens.token();
+        onboard(consenting.build());
+        onboard(revoked.build());
+        perform(consent(false), revoked.build()).andExpect(status().isCreated());
+        UUID otherId =
+                userRepository.findByIdentityId(consenting.subjectValue()).orElseThrow().getId();
+
+        perform(
+                        post("/api/assessments")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"patientId\": \""
+                                                + otherId
+                                                + "\", \"freeText\": \"cough\"}"),
+                        revoked.build())
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("consent-required"));
     }
