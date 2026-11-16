@@ -57,7 +57,8 @@ paths:
             Not a patient with an active consent: no profile yet
             (urn:pocket-doc:problem:profile-required), no verified primary email
             (urn:pocket-doc:problem:email-not-verified), consent not granted
-            (urn:pocket-doc:problem:consent-required) or another role
+            (urn:pocket-doc:problem:consent-required), a quarantined identity
+            (urn:pocket-doc:problem:account-quarantined), or another role
             (urn:pocket-doc:problem:forbidden).
         '422':
           description: The prediction service could not identify a supported symptom.

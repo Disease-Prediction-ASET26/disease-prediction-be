@@ -75,6 +75,8 @@ paths:
                 $ref: '#/components/schemas/Problem'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '409':
           description: A profile already exists (urn:pocket-doc:problem:profile-exists).
           content:
@@ -131,7 +133,8 @@ components:
       description: >-
         The user may not do this: no profile yet (urn:pocket-doc:problem:profile-required),
         no verified primary email (urn:pocket-doc:problem:email-not-verified),
-        no active consent (urn:pocket-doc:problem:consent-required) or the wrong role
+        no active consent (urn:pocket-doc:problem:consent-required), a quarantined identity
+        (urn:pocket-doc:problem:account-quarantined), or the wrong role
         (urn:pocket-doc:problem:forbidden).
       content:
         application/problem+json:
