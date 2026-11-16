@@ -55,7 +55,8 @@ paths:
         '403':
           description: >-
             Not a patient with an active consent: no profile yet
-            (urn:pocket-doc:problem:profile-required), consent not granted
+            (urn:pocket-doc:problem:profile-required), no verified primary email
+            (urn:pocket-doc:problem:email-not-verified), consent not granted
             (urn:pocket-doc:problem:consent-required) or another role
             (urn:pocket-doc:problem:forbidden).
         '422':

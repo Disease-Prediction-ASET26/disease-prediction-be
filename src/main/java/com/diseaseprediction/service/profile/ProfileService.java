@@ -49,7 +49,7 @@ public class ProfileService {
      */
     @Transactional
     public Profile getProfile() {
-        AuthenticatedIdentity identity = currentUserService.identity();
+        AuthenticatedIdentity identity = requireVerifiedEmail(HttpStatus.FORBIDDEN);
         User user =
                 userRepository
                         .findByIdentityId(identity.subject())
@@ -68,24 +68,12 @@ public class ProfileService {
      */
     @Transactional
     public Profile createPatientProfile(CreateProfileRequest request) {
-        AuthenticatedIdentity identity = currentUserService.identity();
+        AuthenticatedIdentity identity = requireVerifiedEmail(HttpStatus.BAD_REQUEST);
         if (userRepository.findByIdentityId(identity.subject()).isPresent()) {
             throw ApiProblemException.profileExists();
         }
         if (!Boolean.TRUE.equals(request.getConsentGranted())) {
             throw ApiProblemException.consentRequired(HttpStatus.BAD_REQUEST);
-        }
-        // TEMPORARY (demo without a mail system): the dev Hanko does not verify email addresses
-        // (email.require_verification: false), so an unverified address is accepted here. Anyone
-        // can then register with someone else's address. Restore the check below, and the test
-        // ProfileApiIntegrationTest.onboardingNeedsAVerifiedEmail, before production signup is
-        // enabled.
-        // if (identity.email() == null || !identity.emailVerified()) {
-        //     throw ApiProblemException.emailNotVerified();
-        // }
-        if (identity.email() == null) {
-            // users.email is NOT NULL: the token must still carry an address.
-            throw ApiProblemException.emailNotVerified();
         }
         String fullName = request.getFullName() == null ? "" : request.getFullName().strip();
         if (fullName.isEmpty()) {
@@ -137,12 +125,21 @@ public class ProfileService {
     }
 
     private Patient currentPatient() {
+        requireVerifiedEmail(HttpStatus.FORBIDDEN);
         User user =
                 currentUserService.currentUser().orElseThrow(ApiProblemException::profileRequired);
         if (user instanceof Patient patient) {
             return patient;
         }
         throw ApiProblemException.forbidden();
+    }
+
+    private AuthenticatedIdentity requireVerifiedEmail(HttpStatus status) {
+        AuthenticatedIdentity identity = currentUserService.identity();
+        if (identity.email() == null || identity.email().isBlank() || !identity.emailVerified()) {
+            throw ApiProblemException.emailNotVerified(status);
+        }
+        return identity;
     }
 
     private static Profile toProfile(User user) {

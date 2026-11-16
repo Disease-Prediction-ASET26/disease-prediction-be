@@ -46,11 +46,9 @@ public class ApiProblemException extends RuntimeException {
                 "Consent to health-data processing is required for this feature.");
     }
 
-    public static ApiProblemException emailNotVerified() {
+    public static ApiProblemException emailNotVerified(HttpStatus status) {
         return new ApiProblemException(
-                HttpStatus.BAD_REQUEST,
-                "email-not-verified",
-                "The account has no verified email address.");
+                status, "email-not-verified", "The account has no verified email address.");
     }
 
     public static ApiProblemException invalidProfile(String message) {

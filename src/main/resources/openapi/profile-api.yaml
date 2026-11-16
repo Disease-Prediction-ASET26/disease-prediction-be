@@ -32,6 +32,8 @@ paths:
                 $ref: '#/components/schemas/Profile'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           description: >-
             First login: the session is valid but no profile exists yet
@@ -128,6 +130,7 @@ components:
     Forbidden:
       description: >-
         The user may not do this: no profile yet (urn:pocket-doc:problem:profile-required),
+        no verified primary email (urn:pocket-doc:problem:email-not-verified),
         no active consent (urn:pocket-doc:problem:consent-required) or the wrong role
         (urn:pocket-doc:problem:forbidden).
       content:
@@ -136,7 +139,7 @@ components:
             $ref: '#/components/schemas/Problem'
     IdentityUnavailable:
       description: >-
-        The identity service could not confirm the session, so the request is refused
+        The identity service could not confirm an uncached session, so the request is refused
         (urn:pocket-doc:problem:identity-unavailable).
       content:
         application/problem+json:
