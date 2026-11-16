@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.diseaseprediction.api.model.AssessmentRequest;
 import com.diseaseprediction.service.prediction.PredictionClient;
+import com.diseaseprediction.service.profile.ProfileService;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.util.List;
 
@@ -18,7 +20,8 @@ class AssessmentApiServiceTest {
                 (freeText, symptomEntries) -> {
                     throw new AssertionError("Emergency assessments must not call the model.");
                 };
-        AssessmentApiService service = new AssessmentApiService(predictionClient);
+        AssessmentApiService service =
+                new AssessmentApiService(predictionClient, Mockito.mock(ProfileService.class));
         AssessmentRequest request =
                 new AssessmentRequest().freeText("severe chest pain").symptomEntries(List.of());
 

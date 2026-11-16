@@ -11,13 +11,16 @@ import com.diseaseprediction.api.model.Explanation;
 import com.diseaseprediction.api.model.PredictionResult;
 import com.diseaseprediction.service.assessment.AssessmentApiService;
 import com.diseaseprediction.service.prediction.PredictionClient;
+import com.diseaseprediction.service.profile.ProfileService;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.OffsetDateTime;
@@ -32,12 +35,19 @@ import java.util.UUID;
  * to {@code HttpStatus.BAD_REQUEST}) rather than from an inline controller check; the external
  * assertions below are unchanged. The {@link PredictionClient} is mocked so the backend slice is
  * tested without a live Python service.
+ *
+ * <p>Security filters are off here: this slice tests the web contract. Authentication and the
+ * consent rule are covered by {@code ProfileApiIntegrationTest} and {@code
+ * ApiSecurityIntegrationTest}; the consent check is mocked to pass.
  */
 @WebMvcTest(AssessmentController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import({AssessmentApiService.class, AssessmentControllerTest.MockConfig.class})
 class AssessmentControllerTest {
 
     @Autowired private MockMvc mockMvc;
+
+    @MockitoBean private ProfileService profileService;
 
     static class MockConfig {
         @Bean
