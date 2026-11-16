@@ -75,7 +75,16 @@ public class ProfileService {
         if (!Boolean.TRUE.equals(request.getConsentGranted())) {
             throw ApiProblemException.consentRequired(HttpStatus.BAD_REQUEST);
         }
-        if (identity.email() == null || !identity.emailVerified()) {
+        // TEMPORARY (demo without a mail system): the dev Hanko does not verify email addresses
+        // (email.require_verification: false), so an unverified address is accepted here. Anyone
+        // can then register with someone else's address. Restore the check below, and the test
+        // ProfileApiIntegrationTest.onboardingNeedsAVerifiedEmail, before production signup is
+        // enabled.
+        // if (identity.email() == null || !identity.emailVerified()) {
+        //     throw ApiProblemException.emailNotVerified();
+        // }
+        if (identity.email() == null) {
+            // users.email is NOT NULL: the token must still carry an address.
             throw ApiProblemException.emailNotVerified();
         }
         String fullName = request.getFullName() == null ? "" : request.getFullName().strip();

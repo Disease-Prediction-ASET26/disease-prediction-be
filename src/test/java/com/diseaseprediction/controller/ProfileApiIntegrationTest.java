@@ -17,6 +17,7 @@ import com.diseaseprediction.repository.UserRepository;
 import com.diseaseprediction.security.AuthenticatedApiTest;
 import com.diseaseprediction.security.TestTokens;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -100,6 +101,9 @@ class ProfileApiIntegrationTest extends AuthenticatedApiTest {
                 .andExpect(jsonPath("$.code").value("consent-required"));
     }
 
+    @Disabled(
+            "TEMPORARY: email verification is off for the demo without a mail system (see"
+                    + " ProfileService.createPatientProfile). Re-enable before production signup.")
     @Test
     void onboardingNeedsAVerifiedEmail() throws Exception {
         perform(
@@ -107,6 +111,22 @@ class ProfileApiIntegrationTest extends AuthenticatedApiTest {
                         TestTokens.token().email("ana@example.com", false).build())
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("email-not-verified"));
+
+        perform(
+                        post("/api/me").contentType(MediaType.APPLICATION_JSON).content(ONBOARDING),
+                        TestTokens.token().withoutEmail().build())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("email-not-verified"));
+    }
+
+    /** TEMPORARY demo behaviour: replace with onboardingNeedsAVerifiedEmail when it is restored. */
+    @Test
+    void onboardingAcceptsAnUnverifiedEmailButStillNeedsOne() throws Exception {
+        perform(
+                        post("/api/me").contentType(MediaType.APPLICATION_JSON).content(ONBOARDING),
+                        TestTokens.token().email("ana@example.com", false).build())
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value("ana@example.com"));
 
         perform(
                         post("/api/me").contentType(MediaType.APPLICATION_JSON).content(ONBOARDING),
