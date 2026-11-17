@@ -2,6 +2,8 @@ package com.diseaseprediction.service.assessment;
 
 import com.diseaseprediction.api.model.AssessmentRequest;
 import com.diseaseprediction.api.model.AssessmentResponse;
+import com.diseaseprediction.api.model.FollowupAnswer;
+import com.diseaseprediction.api.model.FollowupRequest;
 import com.diseaseprediction.api.model.PredictionResult;
 import com.diseaseprediction.api.model.SymptomEntry;
 import com.diseaseprediction.exception.InvalidAssessmentRequestException;
@@ -10,6 +12,7 @@ import com.diseaseprediction.service.profile.ProfileService;
 
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -82,6 +85,60 @@ public class AssessmentApiService {
                 .assessmentId(UUID.randomUUID())
                 .emergencyDetected(emergencyDetected)
                 .result(result);
+    }
+
+    /**
+     * Continue an adaptive assessment after a follow-up answer (FR-P3).
+     *
+     * <p>Resolves the yes/no answer into the running confirmed/denied symptom sets, then delegates
+     * the re-ranking to the prediction service. The response may carry another follow-up question;
+     * the loop ends when its result has {@code needsFollowUp == false}. Stateless on the server:
+     * the client carries the accumulated symptom sets each turn.
+     *
+     * <p>MDD Iteration 6: gated exactly like {@link #runAssessment} — only a signed-in patient with
+     * an active consent may continue.
+     *
+     * @param request the follow-up payload (confirmed/denied symptoms so far + the latest answer)
+     * @return the re-ranked assessment response
+     * @throws InvalidAssessmentRequestException if no confirmed symptoms remain after the answer
+     * @throws com.diseaseprediction.exception.ApiProblemException 403 without a patient profile or
+     *     an active consent
+     */
+    public AssessmentResponse continueAssessment(FollowupRequest request) {
+        profileService.requireConsentingPatient();
+        if (request == null) {
+            throw new InvalidAssessmentRequestException("A follow-up request is required.");
+        }
+
+        List<String> confirmed = new ArrayList<>(nullToEmpty(request.getConfirmedSymptoms()));
+        List<String> denied = new ArrayList<>(nullToEmpty(request.getDeniedSymptoms()));
+        int roundsUsed = request.getRoundsUsed() == null ? 0 : request.getRoundsUsed();
+
+        FollowupAnswer answer = request.getAnswer();
+        if (answer != null && answer.getSymptom() != null && !answer.getSymptom().isBlank()) {
+            roundsUsed++;
+            if (Boolean.TRUE.equals(answer.getPresent())) {
+                confirmed.add(answer.getSymptom());
+            } else {
+                denied.add(answer.getSymptom());
+            }
+        }
+
+        if (confirmed.isEmpty()) {
+            throw new InvalidAssessmentRequestException(
+                    "A follow-up must carry at least one confirmed symptom.");
+        }
+
+        PredictionResult result = predictionClient.predictFollowUp(confirmed, denied, roundsUsed);
+
+        return new AssessmentResponse()
+                .assessmentId(UUID.randomUUID())
+                .emergencyDetected(false)
+                .result(result);
+    }
+
+    private static <T> List<T> nullToEmpty(List<T> list) {
+        return list == null ? List.of() : list;
     }
 
     /**

@@ -3,6 +3,7 @@ package com.diseaseprediction.controller;
 import com.diseaseprediction.api.AssessmentsApi;
 import com.diseaseprediction.api.model.AssessmentRequest;
 import com.diseaseprediction.api.model.AssessmentResponse;
+import com.diseaseprediction.api.model.FollowupRequest;
 import com.diseaseprediction.service.assessment.AssessmentApiService;
 
 import org.springframework.http.ResponseEntity;
@@ -37,5 +38,18 @@ public class AssessmentController implements AssessmentsApi {
     @Override
     public ResponseEntity<AssessmentResponse> submitAssessment(AssessmentRequest request) {
         return ResponseEntity.ok(assessmentApiService.runAssessment(request));
+    }
+
+    /**
+     * Answer a follow-up question and receive an updated prediction. Thin pass-through: the service
+     * resolves the answer into the running symptom sets, re-ranks across the SOA boundary, and may
+     * return another follow-up question (loop ends when {@code result.needsFollowUp} is false).
+     *
+     * @param request the follow-up payload (confirmed/denied symptoms so far + the latest answer)
+     * @return 200 with an {@link AssessmentResponse}
+     */
+    @Override
+    public ResponseEntity<AssessmentResponse> submitFollowup(FollowupRequest request) {
+        return ResponseEntity.ok(assessmentApiService.continueAssessment(request));
     }
 }
