@@ -72,6 +72,19 @@ class AssessmentControllerTest {
                                                                                     "cough",
                                                                                     0.5)))));
             when(client.predict(any(), any())).thenReturn(stub);
+            when(client.predictFollowUp(any(), any(), org.mockito.ArgumentMatchers.anyInt()))
+                    .thenReturn(
+                            new PredictionResult()
+                                    .resultId(UUID.randomUUID())
+                                    .generatedAt(OffsetDateTime.parse("2026-10-31T12:00:00Z"))
+                                    .disclaimer("This is not a medical diagnosis")
+                                    .needsFollowUp(false)
+                                    .predictions(
+                                            List.of(
+                                                    new DiseasePrediction()
+                                                            .rank(1)
+                                                            .probability(0.97)
+                                                            .diseaseName("Fungal infection"))));
             return client;
         }
     }
@@ -185,5 +198,42 @@ class AssessmentControllerTest {
                                 .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.emergencyDetected").value(false));
+    }
+
+    @Test
+    void followupReturns200WithUpdatedPrediction() throws Exception {
+        String body =
+                """
+                {
+                  "confirmedSymptoms": ["itching"],
+                  "deniedSymptoms": [],
+                  "answer": { "symptom": "nodal_skin_eruptions", "present": true },
+                  "roundsUsed": 0
+                }
+                """;
+
+        mockMvc.perform(
+                        post("/api/assessments/followup")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assessmentId").exists())
+                .andExpect(jsonPath("$.result.needsFollowUp").value(false))
+                .andExpect(
+                        jsonPath("$.result.predictions[0].diseaseName").value("Fungal infection"));
+    }
+
+    @Test
+    void followupWithNoConfirmedSymptomsReturns400() throws Exception {
+        String body =
+                """
+                { "confirmedSymptoms": [], "deniedSymptoms": [], "roundsUsed": 0 }
+                """;
+
+        mockMvc.perform(
+                        post("/api/assessments/followup")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isBadRequest());
     }
 }

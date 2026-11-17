@@ -69,6 +69,52 @@ paths:
             The prediction service is temporarily unavailable, or the identity service
             could not confirm the session (urn:pocket-doc:problem:identity-unavailable).
 
+  /api/assessments/followup:
+    post:
+      tags:
+        - Assessments
+      summary: Answer a follow-up question and receive an updated prediction.
+      description: >-
+        Continues an adaptive assessment. When a previous prediction was below the
+        confidence threshold, the prediction service offered a yes/no follow-up question
+        about a symptom. The client answers it here, carrying back the symptoms confirmed
+        and denied so far; the backend relays the answer across the SOA boundary and
+        returns a re-ranked result, which may itself carry another follow-up question.
+        The loop ends when the response's prediction result has needsFollowUp = false.
+        Requires a signed-in patient with an active consent (MDD Iteration 6); the patient
+        is taken from the session token.
+      operationId: submitFollowup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FollowupRequest'
+      responses:
+        '200':
+          description: Follow-up processed; updated prediction result returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentResponse'
+        '400':
+          description: The payload carried no confirmed symptoms to predict from.
+        '401':
+          description: >-
+            Missing, invalid, expired or revoked session token (WWW-Authenticate: Bearer).
+        '403':
+          description: >-
+            Not a patient with an active consent (see POST /api/assessments for the
+            problem types).
+        '422':
+          description: The prediction service could not identify a supported symptom.
+        '502':
+          description: The prediction service returned an invalid response or an error.
+        '503':
+          description: >-
+            The prediction service is temporarily unavailable, or the identity service
+            could not confirm the session (urn:pocket-doc:problem:identity-unavailable).
+
 components:
   securitySchemes:
     bearerAuth:
@@ -144,6 +190,45 @@ components:
           $ref: '#/components/schemas/PredictionResult'
           nullable: true
 
+    FollowupAnswer:
+      type: object
+      description: The patient's yes/no answer to a previous follow-up question.
+      required:
+        - symptom
+        - present
+      properties:
+        symptom:
+          type: string
+          description: Canonical symptom name the question was about.
+        present:
+          type: boolean
+          description: The patient's answer - true for yes, false for no.
+
+    FollowupRequest:
+      type: object
+      description: >-
+        Inbound contract for POST /api/assessments/followup. The client carries back the
+        symptoms confirmed and denied so far (the loop is stateless on the server) plus the
+        answer to the most recent question.
+      properties:
+        confirmedSymptoms:
+          type: array
+          description: Canonical symptom names known present so far (original parse + every yes).
+          items:
+            type: string
+        deniedSymptoms:
+          type: array
+          description: Canonical symptom names answered no so far, carried so they are not re-asked.
+          items:
+            type: string
+        answer:
+          $ref: '#/components/schemas/FollowupAnswer'
+          nullable: true
+        roundsUsed:
+          type: integer
+          format: int32
+          description: How many follow-up questions have already been answered (caps the loop).
+
     PredictionResult:
       type: object
       description: >-
@@ -166,6 +251,41 @@ components:
           description: Ranked disease predictions.
           items:
             $ref: '#/components/schemas/DiseasePrediction'
+        activeSymptoms:
+          type: array
+          description: >-
+            Canonical symptoms currently known present. Echoed back so the client can carry
+            them into a follow-up request.
+          items:
+            type: string
+        needsFollowUp:
+          type: boolean
+          description: >-
+            True when confidence is below the threshold and a follow-up question is offered.
+        followUp:
+          $ref: '#/components/schemas/FollowUp'
+          nullable: true
+
+    FollowUp:
+      type: object
+      description: >-
+        A yes/no question that would sharpen a low-confidence prediction (FR-P3 adaptive
+        questioning). The client shows the question, collects the answer, and posts it to
+        POST /api/assessments/followup.
+      properties:
+        symptom:
+          type: string
+          description: Canonical symptom name to answer yes/no about.
+        question:
+          type: string
+          description: Human-readable yes/no question to show the patient.
+        topDisease:
+          type: string
+          description: Current most-likely disease the question tries to confirm.
+        confidence:
+          type: number
+          format: double
+          description: Current confidence in the top disease (0..1).
 
     DiseasePrediction:
       type: object
