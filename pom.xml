@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.diseaseprediction</groupId>
     <artifactId>disease-prediction-be</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1</version>
     <name>disease-prediction-be</name>
     <description>disease-prediction-be</description>
     <url/>
@@ -122,6 +122,7 @@
     </dependencies>
 
     <build>
+        <finalName>${project.artifactId}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
