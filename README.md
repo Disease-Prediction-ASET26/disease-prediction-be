@@ -82,6 +82,15 @@ to check the production image. For predictions, connect an AI service and set
 `PREDICTION_SERVICE_BASE_URL` to its address on the same network, or use the
 full stack above.
 
+### CI image versions
+
+The shared CI workflow reads the backend's SemVer release version from the root `<version>` in
+`pom.xml`. Keep it in strict `X.Y.Z` form, without Maven's `-SNAPSHOT` suffix. CI publishes
+`X.Y.Z` from `main`; bump the version before merging a change that needs a new production image.
+On `develop`, CI publishes `X.Y.Z-dev.<shortsha>.<run>.<attempt>`. Pull requests use
+`X.Y.Z-pr.<number>.<shortsha>.<run>.<attempt>`. GitOps deploys the readable tag with its SHA-256
+digest, for example `ghcr.io/disease-prediction-aset26/disease-prediction-be:0.0.1@sha256:<digest>`.
+
 Backend tests use Testcontainers and need the host Docker daemon. Run them from
 this repository on the host as described in [Tests and coverage](#tests-and-coverage).
 
