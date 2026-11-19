@@ -186,7 +186,12 @@ public class HttpPredictionClient implements PredictionClient {
                 new DiseasePrediction()
                         .rank(prediction.rank())
                         .probability(prediction.probability())
-                        .diseaseName(prediction.diseaseName());
+                        .diseaseName(prediction.diseaseName())
+                        .description(prediction.description())
+                        .precautions(
+                                prediction.precautions() == null
+                                        ? List.of()
+                                        : prediction.precautions());
         if (prediction.explanation() != null) {
             AiExplanation explanation = prediction.explanation();
             Map<String, Double> weights =
@@ -232,6 +237,8 @@ public class HttpPredictionClient implements PredictionClient {
             int rank,
             @JsonProperty("disease_name") String diseaseName,
             double probability,
+            String description,
+            List<String> precautions,
             AiExplanation explanation) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)

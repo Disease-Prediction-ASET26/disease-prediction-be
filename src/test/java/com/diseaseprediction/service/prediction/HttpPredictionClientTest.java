@@ -44,6 +44,8 @@ class HttpPredictionClientTest {
                                     "disease_name": "Common Cold",
                                     "probability": 0.82,
                                     "specialty": "General Practice",
+                                    "description": "A common viral infection of the nose and throat.",
+                                    "precautions": ["rest", "drink fluids", "stay warm"],
                                     "explanation": {
                                       "summary": "Cough is a common symptom.",
                                       "contribution_weights": {"cough": 0.5}
@@ -68,6 +70,12 @@ class HttpPredictionClientTest {
         assertEquals("This is not a medical diagnosis.", result.getDisclaimer());
         assertEquals("Common Cold", result.getPredictions().getFirst().getDiseaseName());
         assertEquals(0.82, result.getPredictions().getFirst().getProbability());
+        assertEquals(
+                "A common viral infection of the nose and throat.",
+                result.getPredictions().getFirst().getDescription());
+        assertEquals(
+                List.of("rest", "drink fluids", "stay warm"),
+                result.getPredictions().getFirst().getPrecautions());
         assertEquals(
                 Map.of("cough", 0.5),
                 result.getPredictions().getFirst().getExplanation().getContributionWeights());
