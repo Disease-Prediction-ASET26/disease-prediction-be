@@ -2,13 +2,16 @@ package com.diseaseprediction.service.prediction;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.diseaseprediction.api.model.PredictionResult;
+import com.diseaseprediction.api.model.RedFlag;
 import com.diseaseprediction.api.model.SymptomEntry;
+import com.diseaseprediction.api.model.Urgency;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -168,5 +171,69 @@ class HttpPredictionClientTest {
         assertEquals("Fungal infection", result.getPredictions().getFirst().getDiseaseName());
         assertEquals(0.97, result.getPredictions().getFirst().getProbability());
         server.verify();
+    }
+
+    @Test
+    void relaysRedFlagsAndHighestUrgency() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://prediction.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://prediction.test/predict"))
+                .andRespond(
+                        withSuccess(
+                                """
+                                {
+                                  "disclaimer": "This is not a medical diagnosis.",
+                                  "active_symptoms": ["breathlessness", "chest_pain"],
+                                  "predictions": [],
+                                  "red_flags": [
+                                    {
+                                      "name": "possible_cardiac_event",
+                                      "urgency": "EMERGENCY",
+                                      "message": "Call emergency services (112) now.",
+                                      "matched_symptoms": ["breathlessness", "chest_pain"]
+                                    },
+                                    {
+                                      "name": "acute_breathing_difficulty",
+                                      "urgency": "URGENT",
+                                      "message": "See a doctor promptly today.",
+                                      "matched_symptoms": ["breathlessness"]
+                                    }
+                                  ],
+                                  "highest_urgency": "EMERGENCY"
+                                }
+                                """,
+                                MediaType.APPLICATION_JSON));
+
+        PredictionResult result =
+                new HttpPredictionClient(builder.build(), 5)
+                        .predict("chest pain and short of breath", List.of());
+
+        assertEquals(Urgency.EMERGENCY, result.getHighestUrgency());
+        assertEquals(2, result.getRedFlags().size());
+        RedFlag first = result.getRedFlags().getFirst();
+        assertEquals("possible_cardiac_event", first.getName());
+        assertEquals(Urgency.EMERGENCY, first.getUrgency());
+        assertEquals("Call emergency services (112) now.", first.getMessage());
+        assertEquals(List.of("breathlessness", "chest_pain"), first.getMatchedSymptoms());
+        assertEquals(Urgency.URGENT, result.getRedFlags().get(1).getUrgency());
+    }
+
+    @Test
+    void missingRedFlagFieldsMeanNoUrgency() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://prediction.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://prediction.test/predict"))
+                .andRespond(
+                        withSuccess(
+                                """
+                                {"disclaimer": "x", "active_symptoms": ["cough"], "predictions": []}
+                                """,
+                                MediaType.APPLICATION_JSON));
+
+        PredictionResult result =
+                new HttpPredictionClient(builder.build(), 5).predict("cough", List.of());
+
+        assertEquals(List.of(), result.getRedFlags());
+        assertNull(result.getHighestUrgency());
     }
 }

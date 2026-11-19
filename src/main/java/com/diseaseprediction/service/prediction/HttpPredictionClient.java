@@ -4,7 +4,9 @@ import com.diseaseprediction.api.model.DiseasePrediction;
 import com.diseaseprediction.api.model.Explanation;
 import com.diseaseprediction.api.model.FollowUp;
 import com.diseaseprediction.api.model.PredictionResult;
+import com.diseaseprediction.api.model.RedFlag;
 import com.diseaseprediction.api.model.SymptomEntry;
+import com.diseaseprediction.api.model.Urgency;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -167,7 +169,14 @@ public class HttpPredictionClient implements PredictionClient {
                                 response.activeSymptoms() == null
                                         ? List.of()
                                         : response.activeSymptoms())
-                        .needsFollowUp(Boolean.TRUE.equals(response.needsFollowUp()));
+                        .needsFollowUp(Boolean.TRUE.equals(response.needsFollowUp()))
+                        .redFlags(
+                                response.redFlags() == null
+                                        ? List.of()
+                                        : response.redFlags().stream()
+                                                .map(HttpPredictionClient::toRedFlag)
+                                                .toList())
+                        .highestUrgency(toUrgency(response.highestUrgency()));
 
         if (response.followUp() != null) {
             AiFollowUp followUp = response.followUp();
@@ -179,6 +188,27 @@ public class HttpPredictionClient implements PredictionClient {
                             .confidence(followUp.confidence()));
         }
         return result;
+    }
+
+    private static RedFlag toRedFlag(AiRedFlag flag) {
+        return new RedFlag()
+                .name(flag.name())
+                .urgency(toUrgency(flag.urgency()))
+                .message(flag.message())
+                .matchedSymptoms(
+                        flag.matchedSymptoms() == null ? List.of() : flag.matchedSymptoms());
+    }
+
+    /** Maps the service's urgency string; unknown or missing values mean "no urgency". */
+    private static Urgency toUrgency(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Urgency.fromValue(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     private static DiseasePrediction toDiseasePrediction(AiPrediction prediction) {
@@ -223,7 +253,16 @@ public class HttpPredictionClient implements PredictionClient {
             String disclaimer,
             @JsonProperty("active_symptoms") List<String> activeSymptoms,
             @JsonProperty("needs_follow_up") Boolean needsFollowUp,
-            @JsonProperty("follow_up") AiFollowUp followUp) {}
+            @JsonProperty("follow_up") AiFollowUp followUp,
+            @JsonProperty("red_flags") List<AiRedFlag> redFlags,
+            @JsonProperty("highest_urgency") String highestUrgency) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record AiRedFlag(
+            String name,
+            String urgency,
+            String message,
+            @JsonProperty("matched_symptoms") List<String> matchedSymptoms) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record AiFollowUp(
