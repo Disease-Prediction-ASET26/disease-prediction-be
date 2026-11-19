@@ -304,6 +304,15 @@ components:
         diseaseName:
           type: string
           description: Name of the predicted disease.
+        description:
+          type: string
+          nullable: true
+          description: Human-readable description of the disease, when available.
+        precautions:
+          type: array
+          description: Recommended precautions for the disease (may be empty).
+          items:
+            type: string
         explanation:
           $ref: '#/components/schemas/Explanation'
 
