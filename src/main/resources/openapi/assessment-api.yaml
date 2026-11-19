@@ -185,7 +185,9 @@ components:
           description: Identifier generated for this assessment.
         emergencyDetected:
           type: boolean
-          description: Whether a red-flag / emergency condition was detected.
+          description: >-
+            True when the prediction service reported urgency EMERGENCY (call an ambulance,
+            112). Kept for older clients; result.highestUrgency carries the full level.
         result:
           $ref: '#/components/schemas/PredictionResult'
           nullable: true
@@ -265,6 +267,46 @@ components:
         followUp:
           $ref: '#/components/schemas/FollowUp'
           nullable: true
+        redFlags:
+          type: array
+          description: >-
+            Red-flag rules fired by the active symptoms, most urgent first. Computed by the
+            prediction service, which is the single source of truth for urgency.
+          items:
+            $ref: '#/components/schemas/RedFlag'
+        highestUrgency:
+          $ref: '#/components/schemas/Urgency'
+          nullable: true
+
+    Urgency:
+      type: string
+      description: >-
+        How urgently the patient needs care, driven by symptoms (never by a disease's
+        precaution text). EMERGENCY = call an ambulance (112) or go to the nearest emergency
+        department now; URGENT = see a doctor promptly today; ADVISORY = worth mentioning.
+        Absent (null) when no red flag fired.
+      enum:
+        - EMERGENCY
+        - URGENT
+        - ADVISORY
+
+    RedFlag:
+      type: object
+      description: A red-flag rule that fired for the reported symptoms.
+      properties:
+        name:
+          type: string
+          description: Rule identifier, e.g. possible_cardiac_event.
+        urgency:
+          $ref: '#/components/schemas/Urgency'
+        message:
+          type: string
+          description: Patient-facing instruction (e.g. call 112, or see a doctor promptly).
+        matchedSymptoms:
+          type: array
+          description: Canonical symptoms that triggered the rule.
+          items:
+            type: string
 
     FollowUp:
       type: object

@@ -3,15 +3,19 @@ package com.diseaseprediction.service.assessment;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.diseaseprediction.api.model.AssessmentRequest;
+import com.diseaseprediction.api.model.AssessmentResponse;
 import com.diseaseprediction.api.model.FollowUp;
 import com.diseaseprediction.api.model.FollowupAnswer;
 import com.diseaseprediction.api.model.FollowupRequest;
 import com.diseaseprediction.api.model.PredictionResult;
+import com.diseaseprediction.api.model.RedFlag;
 import com.diseaseprediction.api.model.SymptomEntry;
+import com.diseaseprediction.api.model.Urgency;
 import com.diseaseprediction.exception.InvalidAssessmentRequestException;
 import com.diseaseprediction.service.prediction.PredictionClient;
 import com.diseaseprediction.service.profile.ProfileService;
@@ -46,31 +50,90 @@ class AssessmentApiServiceTest {
         }
     }
 
-    @Test
-    void emergencyAssessmentSkipsPredictionService() {
-        PredictionClient predictionClient =
-                new PredictionClient() {
-                    @Override
-                    public PredictionResult predict(
-                            String freeText, List<SymptomEntry> symptomEntries) {
-                        throw new AssertionError("Emergency assessments must not call the model.");
-                    }
+    /** A client whose initial prediction carries the given urgency. */
+    private static PredictionClient clientReturning(PredictionResult result) {
+        return new PredictionClient() {
+            @Override
+            public PredictionResult predict(String freeText, List<SymptomEntry> symptomEntries) {
+                return result;
+            }
 
-                    @Override
-                    public PredictionResult predictFollowUp(
-                            List<String> confirmed, List<String> denied, int roundsUsed) {
-                        throw new AssertionError("Emergency assessments must not call the model.");
-                    }
-                };
+            @Override
+            public PredictionResult predictFollowUp(
+                    List<String> confirmed, List<String> denied, int roundsUsed) {
+                return result;
+            }
+        };
+    }
+
+    private static PredictionResult resultWithUrgency(Urgency urgency) {
+        return new PredictionResult()
+                .predictions(List.of())
+                .redFlags(
+                        urgency == null
+                                ? List.of()
+                                : List.of(
+                                        new RedFlag()
+                                                .name("rule")
+                                                .urgency(urgency)
+                                                .message("message")
+                                                .matchedSymptoms(List.of("chest_pain"))))
+                .highestUrgency(urgency);
+    }
+
+    private static AssessmentResponse assess(PredictionResult result) {
         AssessmentApiService service =
-                new AssessmentApiService(predictionClient, Mockito.mock(ProfileService.class));
-        AssessmentRequest request =
-                new AssessmentRequest().freeText("severe chest pain").symptomEntries(List.of());
+                new AssessmentApiService(
+                        clientReturning(result), Mockito.mock(ProfileService.class));
+        return service.runAssessment(
+                new AssessmentRequest().freeText("chest pain").symptomEntries(List.of()));
+    }
 
-        var response = service.runAssessment(request);
+    @Test
+    void emergencyUrgencyFromThePredictionServiceSetsEmergencyDetected() {
+        PredictionResult result = resultWithUrgency(Urgency.EMERGENCY);
+
+        AssessmentResponse response = assess(result);
 
         assertTrue(response.getEmergencyDetected());
-        assertNull(response.getResult());
+        // The result is relayed so the client can show the red flags; it leads with the alert.
+        assertSame(result, response.getResult());
+        assertEquals(Urgency.EMERGENCY, response.getResult().getHighestUrgency());
+    }
+
+    @Test
+    void urgentUrgencyIsNotAnEmergency() {
+        AssessmentResponse response = assess(resultWithUrgency(Urgency.URGENT));
+
+        assertFalse(response.getEmergencyDetected());
+        assertEquals(Urgency.URGENT, response.getResult().getHighestUrgency());
+    }
+
+    @Test
+    void noRedFlagMeansNoEmergencyEvenForAlarmingWords() {
+        // The backend keeps no keyword list: "chest pain" alone is not an emergency unless the
+        // prediction service says so.
+        AssessmentResponse response = assess(resultWithUrgency(null));
+
+        assertFalse(response.getEmergencyDetected());
+        assertNull(response.getResult().getHighestUrgency());
+    }
+
+    @Test
+    void followUpRelaysEmergencyUrgency() {
+        AssessmentApiService service =
+                new AssessmentApiService(
+                        clientReturning(resultWithUrgency(Urgency.EMERGENCY)),
+                        Mockito.mock(ProfileService.class));
+
+        AssessmentResponse response =
+                service.continueAssessment(
+                        new FollowupRequest()
+                                .confirmedSymptoms(new ArrayList<>(List.of("chest_pain")))
+                                .roundsUsed(0)
+                                .answer(new FollowupAnswer().symptom("sweating").present(true)));
+
+        assertTrue(response.getEmergencyDetected());
     }
 
     @Test
