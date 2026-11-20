@@ -6,9 +6,12 @@ import com.diseaseprediction.api.model.FollowupAnswer;
 import com.diseaseprediction.api.model.FollowupRequest;
 import com.diseaseprediction.api.model.PredictionResult;
 import com.diseaseprediction.api.model.Urgency;
+import com.diseaseprediction.domain.enums.AccessAction;
+import com.diseaseprediction.domain.enums.ResourceType;
 import com.diseaseprediction.exception.InvalidAssessmentRequestException;
+import com.diseaseprediction.security.access.AuditedAccess;
+import com.diseaseprediction.security.access.RequiresActiveConsent;
 import com.diseaseprediction.service.prediction.PredictionClient;
-import com.diseaseprediction.service.profile.ProfileService;
 
 import org.springframework.stereotype.Service;
 
@@ -35,16 +38,17 @@ import java.util.UUID;
  *
  * <p>Named {@code AssessmentApiService} to coexist with the pre-existing domain-coupled {@code
  * AssessmentService}; this class is the web-layer orchestrator introduced by Iteration 2.
+ *
+ * <p>Access rules are declared, not coded: {@link RequiresActiveConsent} lets only a consenting
+ * patient in, and {@link AuditedAccess} records every call (Lab 9, Personal Data Access Guard).
  */
 @Service
 public class AssessmentApiService {
 
     private final PredictionClient predictionClient;
-    private final ProfileService profileService;
 
-    public AssessmentApiService(PredictionClient predictionClient, ProfileService profileService) {
+    public AssessmentApiService(PredictionClient predictionClient) {
         this.predictionClient = predictionClient;
-        this.profileService = profileService;
     }
 
     /**
@@ -57,13 +61,15 @@ public class AssessmentApiService {
      * @param request the assessment request
      * @return the assessment response carrying the emergency flag and prediction result
      *     <p>MDD Iteration 6: only a signed-in patient with an active consent may submit (UC1 step
-     *     1). The patient comes from the session token; {@code request.patientId} is ignored.
+     *     1), enforced by {@link RequiresActiveConsent}. The patient comes from the session token;
+     *     {@code request.patientId} is ignored.
      * @throws InvalidAssessmentRequestException if the request carries no symptom signal
      * @throws com.diseaseprediction.exception.ApiProblemException 403 without a patient profile or
      *     an active consent
      */
+    @AuditedAccess(action = AccessAction.CREATE, resource = ResourceType.ASSESSMENT)
+    @RequiresActiveConsent
     public AssessmentResponse runAssessment(AssessmentRequest request) {
-        profileService.requireConsentingPatient();
         if (request == null || !hasAnySymptomSignal(request)) {
             throw new InvalidAssessmentRequestException(
                     "Assessment must include free text or at least one symptom entry with text.");
@@ -95,8 +101,9 @@ public class AssessmentApiService {
      * @throws com.diseaseprediction.exception.ApiProblemException 403 without a patient profile or
      *     an active consent
      */
+    @AuditedAccess(action = AccessAction.UPDATE, resource = ResourceType.ASSESSMENT)
+    @RequiresActiveConsent
     public AssessmentResponse continueAssessment(FollowupRequest request) {
-        profileService.requireConsentingPatient();
         if (request == null) {
             throw new InvalidAssessmentRequestException("A follow-up request is required.");
         }

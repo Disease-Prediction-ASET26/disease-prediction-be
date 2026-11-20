@@ -13,7 +13,6 @@ import com.diseaseprediction.api.model.RedFlag;
 import com.diseaseprediction.api.model.Urgency;
 import com.diseaseprediction.service.assessment.AssessmentApiService;
 import com.diseaseprediction.service.prediction.PredictionClient;
-import com.diseaseprediction.service.profile.ProfileService;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +21,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.OffsetDateTime;
@@ -40,7 +38,8 @@ import java.util.UUID;
  *
  * <p>Security filters are off here: this slice tests the web contract. Authentication and the
  * consent rule are covered by {@code ProfileApiIntegrationTest} and {@code
- * ApiSecurityIntegrationTest}; the consent check is mocked to pass.
+ * ApiSecurityIntegrationTest}. The access guard aspects are not part of this slice, so the consent
+ * rule does not apply here.
  */
 @WebMvcTest(AssessmentController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -48,8 +47,6 @@ import java.util.UUID;
 class AssessmentControllerTest {
 
     @Autowired private MockMvc mockMvc;
-
-    @MockitoBean private ProfileService profileService;
 
     static class MockConfig {
         @Bean
