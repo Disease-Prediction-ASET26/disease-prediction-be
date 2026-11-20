@@ -20,6 +20,7 @@ record AccessVerdict(AccessOutcome outcome, String reasonCode) {
 
     static AccessVerdict of(Throwable failure) {
         return switch (failure) {
+            case null -> new AccessVerdict(AccessOutcome.FAILED, null);
             case ApiProblemException problem -> {
                 int status = problem.getStatus().value();
                 AccessOutcome outcome =
