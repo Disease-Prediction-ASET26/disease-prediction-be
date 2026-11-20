@@ -18,10 +18,8 @@ import com.diseaseprediction.api.model.SymptomEntry;
 import com.diseaseprediction.api.model.Urgency;
 import com.diseaseprediction.exception.InvalidAssessmentRequestException;
 import com.diseaseprediction.service.prediction.PredictionClient;
-import com.diseaseprediction.service.profile.ProfileService;
 
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -82,9 +80,7 @@ class AssessmentApiServiceTest {
     }
 
     private static AssessmentResponse assess(PredictionResult result) {
-        AssessmentApiService service =
-                new AssessmentApiService(
-                        clientReturning(result), Mockito.mock(ProfileService.class));
+        AssessmentApiService service = new AssessmentApiService(clientReturning(result));
         return service.runAssessment(
                 new AssessmentRequest().freeText("chest pain").symptomEntries(List.of()));
     }
@@ -122,9 +118,7 @@ class AssessmentApiServiceTest {
     @Test
     void followUpRelaysEmergencyUrgency() {
         AssessmentApiService service =
-                new AssessmentApiService(
-                        clientReturning(resultWithUrgency(Urgency.EMERGENCY)),
-                        Mockito.mock(ProfileService.class));
+                new AssessmentApiService(clientReturning(resultWithUrgency(Urgency.EMERGENCY)));
 
         AssessmentResponse response =
                 service.continueAssessment(
@@ -139,8 +133,7 @@ class AssessmentApiServiceTest {
     @Test
     void followUpYesAnswerAddsToConfirmedAndCountsTheRound() {
         RecordingPredictionClient client = new RecordingPredictionClient();
-        AssessmentApiService service =
-                new AssessmentApiService(client, Mockito.mock(ProfileService.class));
+        AssessmentApiService service = new AssessmentApiService(client);
 
         FollowupRequest request =
                 new FollowupRequest()
@@ -160,8 +153,7 @@ class AssessmentApiServiceTest {
     @Test
     void followUpNoAnswerAddsToDeniedAndCountsTheRound() {
         RecordingPredictionClient client = new RecordingPredictionClient();
-        AssessmentApiService service =
-                new AssessmentApiService(client, Mockito.mock(ProfileService.class));
+        AssessmentApiService service = new AssessmentApiService(client);
 
         FollowupRequest request =
                 new FollowupRequest()
@@ -184,8 +176,7 @@ class AssessmentApiServiceTest {
                 new PredictionResult()
                         .needsFollowUp(true)
                         .followUp(new FollowUp().symptom("chills").question("Do you have chills?"));
-        AssessmentApiService service =
-                new AssessmentApiService(client, Mockito.mock(ProfileService.class));
+        AssessmentApiService service = new AssessmentApiService(client);
 
         FollowupRequest request =
                 new FollowupRequest()
@@ -202,8 +193,7 @@ class AssessmentApiServiceTest {
     @Test
     void followUpWithNoConfirmedSymptomsIsRejected() {
         RecordingPredictionClient client = new RecordingPredictionClient();
-        AssessmentApiService service =
-                new AssessmentApiService(client, Mockito.mock(ProfileService.class));
+        AssessmentApiService service = new AssessmentApiService(client);
 
         FollowupRequest request =
                 new FollowupRequest().confirmedSymptoms(new ArrayList<>()).roundsUsed(0);

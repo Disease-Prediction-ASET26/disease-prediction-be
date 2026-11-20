@@ -6,11 +6,14 @@ import com.diseaseprediction.api.model.Profile;
 import com.diseaseprediction.api.model.Role;
 import com.diseaseprediction.domain.Patient;
 import com.diseaseprediction.domain.User;
+import com.diseaseprediction.domain.enums.AccessAction;
+import com.diseaseprediction.domain.enums.ResourceType;
 import com.diseaseprediction.exception.ApiProblemException;
 import com.diseaseprediction.repository.PatientRepository;
 import com.diseaseprediction.repository.UserRepository;
 import com.diseaseprediction.security.AuthenticatedIdentity;
 import com.diseaseprediction.security.CurrentUserService;
+import com.diseaseprediction.security.access.AuditedAccess;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -47,6 +50,7 @@ public class ProfileService {
      *
      * @throws ApiProblemException 404 {@code profile-not-found} on the first login
      */
+    @AuditedAccess(action = AccessAction.READ, resource = ResourceType.PATIENT_PROFILE)
     @Transactional
     public Profile getProfile() {
         AuthenticatedIdentity identity = requireVerifiedEmail(HttpStatus.FORBIDDEN);
@@ -66,6 +70,7 @@ public class ProfileService {
      * First-login onboarding: creates a patient profile with its first consent. New accounts are
      * always patients.
      */
+    @AuditedAccess(action = AccessAction.CREATE, resource = ResourceType.PATIENT_PROFILE)
     @Transactional
     public Profile createPatientProfile(CreateProfileRequest request) {
         AuthenticatedIdentity identity = requireVerifiedEmail(HttpStatus.BAD_REQUEST);
@@ -96,6 +101,7 @@ public class ProfileService {
     }
 
     /** Appends a grant or revoke to the signed-in patient's consent history (FR-G1). */
+    @AuditedAccess(action = AccessAction.UPDATE, resource = ResourceType.CONSENT)
     @Transactional
     public Profile recordConsent(ConsentRequest request) {
         Patient patient = currentPatient();
@@ -109,7 +115,9 @@ public class ProfileService {
     }
 
     /**
-     * Guard for features that process health data (UC1 step 1).
+     * Guard for features that process health data (UC1 step 1). Called by {@link
+     * com.diseaseprediction.security.access.ConsentAspect} for methods annotated with {@link
+     * com.diseaseprediction.security.access.RequiresActiveConsent}; do not call it directly.
      *
      * @return the signed-in patient
      * @throws ApiProblemException 403 {@code profile-required}, {@code forbidden} or {@code
