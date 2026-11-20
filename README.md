@@ -212,6 +212,35 @@ To use another Hanko instance, set these variables (the dev values are in the do
 | `HANKO_API_URL` | `http://localhost:8100` |
 | `HANKO_SESSION_CHECK_TTL` | `60s` |
 
+### Personal Data Access Guard (AOP)
+
+Two annotations in `security/access` guard service methods that touch personal or health data:
+
+- `@RequiresActiveConsent`: `ConsentAspect` runs `ProfileService.requireConsentingPatient()`
+  before the method, so only a patient with a verified email and an active consent gets in (403
+  `consent-required` otherwise). Use it instead of calling the check in the method body.
+- `@AuditedAccess(action = ..., resource = ...)`: `AccessAuditAspect` writes one row per call to
+  `access_audit_events` with the outcome `ALLOWED`, `DENIED` (any 401/403) or `FAILED`, and a
+  reason code. Rows hold the user id and role only. The table is append-only: triggers reject
+  `UPDATE`, `DELETE` and `TRUNCATE`.
+
+```java
+@AuditedAccess(action = AccessAction.CREATE, resource = ResourceType.ASSESSMENT)
+@RequiresActiveConsent
+public AssessmentResponse runAssessment(AssessmentRequest request) { ... }
+```
+
+The audit aspect runs outside the consent aspect, so consent refusals are recorded too. Spring AOP
+only sees calls from outside the bean. Requests refused earlier by the security filter chain are
+not audited. To look at the local audit trail:
+
+```bash
+docker exec -it disease-prediction-postgres psql -U disease_prediction -d disease_prediction \
+  -c "SELECT occurred_at, actor_role, action, resource_type, outcome, reason_code FROM access_audit_events ORDER BY occurred_at;"
+```
+
+Design, implementation notes and limits: docs repo, `mdd/iteration6/README.md`, Part B.
+
 ## Develop
 
 1. Branch off `develop` (e.g. `feat/my-change`).
