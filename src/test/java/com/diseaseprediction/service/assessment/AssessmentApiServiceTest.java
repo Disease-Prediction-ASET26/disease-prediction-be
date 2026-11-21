@@ -16,15 +16,44 @@ import com.diseaseprediction.api.model.PredictionResult;
 import com.diseaseprediction.api.model.RedFlag;
 import com.diseaseprediction.api.model.SymptomEntry;
 import com.diseaseprediction.api.model.Urgency;
+import com.diseaseprediction.domain.Patient;
+import com.diseaseprediction.domain.StoredAssessment;
 import com.diseaseprediction.exception.InvalidAssessmentRequestException;
 import com.diseaseprediction.service.prediction.PredictionClient;
+import com.diseaseprediction.service.profile.ProfileService;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 class AssessmentApiServiceTest {
+
+    /** The service with storage and the patient lookup stubbed: these tests cover the logic. */
+    static AssessmentApiService serviceWith(PredictionClient client) {
+        Patient patient = Mockito.mock(Patient.class);
+        Mockito.when(patient.getId()).thenReturn(UUID.randomUUID());
+        ProfileService profiles = Mockito.mock(ProfileService.class);
+        Mockito.when(profiles.requireConsentingPatient()).thenReturn(patient);
+        StoredAssessment stored = Mockito.mock(StoredAssessment.class);
+        Mockito.when(stored.getId()).thenReturn(UUID.randomUUID());
+        AssessmentHistoryService history = Mockito.mock(AssessmentHistoryService.class);
+        Mockito.when(
+                        history.create(
+                                Mockito.any(),
+                                Mockito.any(),
+                                Mockito.any(),
+                                Mockito.anyInt(),
+                                Mockito.any(),
+                                Mockito.anyBoolean()))
+                .thenReturn(stored);
+        return new AssessmentApiService(
+                client, profiles, history, new AssessmentSnapshots(JsonMapper.builder().build()));
+    }
 
     /** Records what the follow-up path forwarded to the prediction client. */
     private static final class RecordingPredictionClient implements PredictionClient {
@@ -80,7 +109,7 @@ class AssessmentApiServiceTest {
     }
 
     private static AssessmentResponse assess(PredictionResult result) {
-        AssessmentApiService service = new AssessmentApiService(clientReturning(result));
+        AssessmentApiService service = serviceWith(clientReturning(result));
         return service.runAssessment(
                 new AssessmentRequest().freeText("chest pain").symptomEntries(List.of()));
     }
@@ -118,7 +147,7 @@ class AssessmentApiServiceTest {
     @Test
     void followUpRelaysEmergencyUrgency() {
         AssessmentApiService service =
-                new AssessmentApiService(clientReturning(resultWithUrgency(Urgency.EMERGENCY)));
+                serviceWith(clientReturning(resultWithUrgency(Urgency.EMERGENCY)));
 
         AssessmentResponse response =
                 service.continueAssessment(
@@ -133,7 +162,7 @@ class AssessmentApiServiceTest {
     @Test
     void followUpYesAnswerAddsToConfirmedAndCountsTheRound() {
         RecordingPredictionClient client = new RecordingPredictionClient();
-        AssessmentApiService service = new AssessmentApiService(client);
+        AssessmentApiService service = serviceWith(client);
 
         FollowupRequest request =
                 new FollowupRequest()
@@ -153,7 +182,7 @@ class AssessmentApiServiceTest {
     @Test
     void followUpNoAnswerAddsToDeniedAndCountsTheRound() {
         RecordingPredictionClient client = new RecordingPredictionClient();
-        AssessmentApiService service = new AssessmentApiService(client);
+        AssessmentApiService service = serviceWith(client);
 
         FollowupRequest request =
                 new FollowupRequest()
@@ -176,7 +205,7 @@ class AssessmentApiServiceTest {
                 new PredictionResult()
                         .needsFollowUp(true)
                         .followUp(new FollowUp().symptom("chills").question("Do you have chills?"));
-        AssessmentApiService service = new AssessmentApiService(client);
+        AssessmentApiService service = serviceWith(client);
 
         FollowupRequest request =
                 new FollowupRequest()
@@ -193,7 +222,7 @@ class AssessmentApiServiceTest {
     @Test
     void followUpWithNoConfirmedSymptomsIsRejected() {
         RecordingPredictionClient client = new RecordingPredictionClient();
-        AssessmentApiService service = new AssessmentApiService(client);
+        AssessmentApiService service = serviceWith(client);
 
         FollowupRequest request =
                 new FollowupRequest().confirmedSymptoms(new ArrayList<>()).roundsUsed(0);

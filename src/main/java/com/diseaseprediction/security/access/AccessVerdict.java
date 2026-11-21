@@ -9,8 +9,9 @@ import org.springframework.security.core.AuthenticationException;
 /**
  * The outcome and reason code recorded for one guarded call. A 401 or 403 means the caller was
  * refused ({@link AccessOutcome#DENIED}); any other exception means an allowed call that failed
- * ({@link AccessOutcome#FAILED}). Reason codes are problem codes or exception class names, never
- * exception messages, so they cannot carry personal data.
+ * ({@link AccessOutcome#FAILED}). An ownership refusal is a denial even though the client sees a
+ * 404. Reason codes are problem codes or exception class names, never exception messages, so they
+ * cannot carry personal data.
  */
 record AccessVerdict(AccessOutcome outcome, String reasonCode) {
 
@@ -21,6 +22,8 @@ record AccessVerdict(AccessOutcome outcome, String reasonCode) {
     static AccessVerdict of(Throwable failure) {
         return switch (failure) {
             case null -> new AccessVerdict(AccessOutcome.FAILED, null);
+            case ResourceAccessDeniedException notOwned ->
+                    new AccessVerdict(AccessOutcome.DENIED, truncate(notOwned.auditReason()));
             case ApiProblemException problem -> {
                 int status = problem.getStatus().value();
                 AccessOutcome outcome =

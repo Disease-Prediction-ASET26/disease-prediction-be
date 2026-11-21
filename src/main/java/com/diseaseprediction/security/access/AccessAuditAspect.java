@@ -10,10 +10,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
+
 /**
  * Enforces {@link AuditedAccess}: records {@code ALLOWED} when the method returns, {@code DENIED}
- * when the caller is refused (a 401/403, including refusals by the inner guards such as {@link
- * ConsentAspect}) and {@code FAILED} for any other exception, which is then rethrown unchanged.
+ * when the caller is refused (a 401/403 or an ownership refusal, including refusals by the inner
+ * guards such as {@link ConsentAspect} and {@link OwnershipAspect}) and {@code FAILED} for any
+ * other exception, which is then rethrown unchanged. When {@link AuditedAccess#resourceId()} is
+ * set, the row also names the record the call touched.
  *
  * <p>Auditing never changes the result of the call: if the audit row cannot be written, the error
  * is logged and the caller gets the response the method produced. The guarded method has already
@@ -27,9 +31,11 @@ public class AccessAuditAspect {
     private static final Logger log = LoggerFactory.getLogger(AccessAuditAspect.class);
 
     private final AuditTrail auditTrail;
+    private final MethodExpressions expressions;
 
-    public AccessAuditAspect(AuditTrail auditTrail) {
+    public AccessAuditAspect(AuditTrail auditTrail, MethodExpressions expressions) {
         this.auditTrail = auditTrail;
+        this.expressions = expressions;
     }
 
     @Around("@annotation(audited)")
@@ -38,17 +44,22 @@ public class AccessAuditAspect {
         try {
             result = call.proceed();
         } catch (Throwable failure) {
-            record(audited, AccessVerdict.of(failure));
+            record(call, audited, null, AccessVerdict.of(failure));
             throw failure;
         }
-        record(audited, AccessVerdict.ALLOWED);
+        record(call, audited, result, AccessVerdict.ALLOWED);
         return result;
     }
 
-    private void record(AuditedAccess audited, AccessVerdict verdict) {
+    private void record(
+            ProceedingJoinPoint call, AuditedAccess audited, Object result, AccessVerdict verdict) {
         try {
             auditTrail.record(
-                    audited.action(), audited.resource(), verdict.outcome(), verdict.reasonCode());
+                    audited.action(),
+                    audited.resource(),
+                    resourceId(call, audited, result),
+                    verdict.outcome(),
+                    verdict.reasonCode());
         } catch (RuntimeException auditFailure) {
             log.error(
                     "Could not record access audit event {} {} {}",
@@ -63,6 +74,22 @@ public class AccessAuditAspect {
                     audited.action(),
                     audited.resource(),
                     verdict.reasonCode());
+        }
+    }
+
+    /** The audited record id. A bad expression or value is logged and never fails the call. */
+    private UUID resourceId(ProceedingJoinPoint call, AuditedAccess audited, Object result) {
+        if (audited.resourceId().isEmpty()) {
+            return null;
+        }
+        try {
+            return expressions.resourceId(call, audited.resourceId(), result);
+        } catch (RuntimeException unreadable) {
+            log.warn(
+                    "Could not read the audited resource id with {}",
+                    audited.resourceId(),
+                    unreadable);
+            return null;
         }
     }
 }

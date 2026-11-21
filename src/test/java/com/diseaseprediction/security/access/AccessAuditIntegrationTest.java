@@ -210,6 +210,7 @@ class AccessAuditIntegrationTest extends AuthenticatedApiTest {
                     auditTrail.record(
                             AccessAction.READ,
                             ResourceType.ASSESSMENT,
+                            null,
                             AccessOutcome.DENIED,
                             "rollback-probe");
                     status.setRollbackOnly();
@@ -224,6 +225,7 @@ class AccessAuditIntegrationTest extends AuthenticatedApiTest {
                 auditTrail.record(
                         AccessAction.READ,
                         ResourceType.PATIENT_PROFILE,
+                        null,
                         AccessOutcome.DENIED,
                         "append-only-probe");
 

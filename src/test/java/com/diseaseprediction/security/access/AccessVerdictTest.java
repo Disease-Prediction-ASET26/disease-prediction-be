@@ -101,4 +101,14 @@ class AccessVerdictTest {
     void noFailureAtAllIsRecordedAsAFailure() {
         assertThat(AccessVerdict.of(null)).isEqualTo(new AccessVerdict(AccessOutcome.FAILED, null));
     }
+
+    @Test
+    void anOwnershipRefusalIsADenialWithItsAuditReasonNotTheClientCode() {
+        assertThat(
+                        AccessVerdict.of(
+                                new ResourceAccessDeniedException(
+                                        com.diseaseprediction.domain.enums.ResourceType.ASSESSMENT,
+                                        ResourceAccessDeniedException.NOT_OWNER)))
+                .isEqualTo(new AccessVerdict(AccessOutcome.DENIED, "not-owner"));
+    }
 }

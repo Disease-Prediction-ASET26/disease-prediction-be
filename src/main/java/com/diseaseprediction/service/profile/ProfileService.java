@@ -132,6 +132,19 @@ public class ProfileService {
         return patient;
     }
 
+    /**
+     * Guard for reading the patient's own health data (MDD Iteration 7). Needs a verified email but
+     * no active consent: withdrawing consent stops new processing, not access to one's data.
+     *
+     * @return the signed-in patient
+     * @throws ApiProblemException 403 {@code email-not-verified}, {@code profile-required} or
+     *     {@code forbidden}
+     */
+    @Transactional(readOnly = true)
+    public Patient requirePatient() {
+        return currentPatient();
+    }
+
     private Patient currentPatient() {
         requireVerifiedEmail(HttpStatus.FORBIDDEN);
         User user =

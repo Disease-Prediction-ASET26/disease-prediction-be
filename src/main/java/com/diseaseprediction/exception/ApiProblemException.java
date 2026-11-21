@@ -60,6 +60,32 @@ public class ApiProblemException extends RuntimeException {
                 HttpStatus.FORBIDDEN, "forbidden", "Your account is not allowed to do this.");
     }
 
+    /** MDD Iteration 7: the assessment is gone, or never belonged to this patient. */
+    public static ApiProblemException assessmentNotFound() {
+        return new ApiProblemException(
+                HttpStatus.NOT_FOUND,
+                "assessment-not-found",
+                "No such record exists for this account.");
+    }
+
+    public static ApiProblemException assessmentCompleted() {
+        return new ApiProblemException(
+                HttpStatus.CONFLICT,
+                "assessment-completed",
+                "This assessment is already completed. Start a new one.");
+    }
+
+    public static ApiProblemException assessmentConflict() {
+        return new ApiProblemException(
+                HttpStatus.CONFLICT,
+                "assessment-conflict",
+                "Another answer was saved for this assessment first. Reload it and try again.");
+    }
+
+    public static ApiProblemException invalidFollowup(String message) {
+        return new ApiProblemException(HttpStatus.BAD_REQUEST, "invalid-followup", message);
+    }
+
     public HttpStatus getStatus() {
         return status;
     }
