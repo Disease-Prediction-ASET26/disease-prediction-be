@@ -13,5 +13,8 @@ public final class AccessGuardOrder {
     /** {@link ConsentAspect}. */
     public static final int CONSENT = 2;
 
+    /** {@link OwnershipAspect}: after consent, so a patient without consent hears about that. */
+    public static final int OWNERSHIP = 3;
+
     private AccessGuardOrder() {}
 }

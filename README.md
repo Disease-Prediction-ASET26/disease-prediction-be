@@ -181,7 +181,15 @@ remove an old subject after email verification.
 
 On the first verified login there is no profile yet: `GET /api/me` returns 404, then `POST /api/me` creates
 the patient profile and records consent. `POST /api/assessments` needs a patient with an active
-consent. Errors are `application/problem+json` with a `code` such as `profile-required` or
+consent.
+
+Assessments are stored (MDD Iteration 7): the input, the follow-up state and the latest result
+are kept encrypted in `assessments`, each with a `DRAFT` report in `reports`. The follow-up loop
+sends `assessmentId` and the answer to `POST /api/assessments/followup`; the server keeps the
+symptom sets. `GET /api/assessments` lists the patient's assessments and
+`GET /api/assessments/{id}` opens one. Reading needs a verified email but no active consent, and
+only the owner can open an assessment: another patient's id and an unknown id both get 404
+`assessment-not-found`. Errors are `application/problem+json` with a `code` such as `profile-required` or
 `consent-required`.
 
 ### Local Hanko
@@ -224,13 +232,20 @@ Two annotations in `security/access` guard service methods that touch personal o
   reason code. Rows hold the user id and role only. The table is append-only: triggers reject
   `UPDATE`, `DELETE` and `TRUNCATE`.
 
+- `@OwnedResource(resource = ..., id = "#assessmentId")`: `OwnershipAspect` lets only the owner of
+  that record through, using an `OwnershipResolver` for the resource type. Refusals answer 404 and
+  are audited as `DENIED` with reason `not-owner` or `unknown-resource`.
+
 ```java
-@AuditedAccess(action = AccessAction.CREATE, resource = ResourceType.ASSESSMENT)
-@RequiresActiveConsent
-public AssessmentResponse runAssessment(AssessmentRequest request) { ... }
+@AuditedAccess(action = AccessAction.READ, resource = ResourceType.ASSESSMENT,
+        resourceId = "#assessmentId")
+@OwnedResource(resource = ResourceType.ASSESSMENT, id = "#assessmentId")
+public AssessmentDetail getAssessment(UUID assessmentId) { ... }
 ```
 
-The audit aspect runs outside the consent aspect, so consent refusals are recorded too. Spring AOP
+`resourceId` names the record in the audit row; after the call, `#result` holds the return value.
+
+The order is audit, consent, ownership, so the audit records the refusals of the other two. Spring AOP
 only sees calls from outside the bean. Requests refused earlier by the security filter chain are
 not audited. To look at the local audit trail:
 

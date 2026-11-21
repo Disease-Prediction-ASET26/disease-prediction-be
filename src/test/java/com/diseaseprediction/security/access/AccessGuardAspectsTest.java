@@ -56,7 +56,7 @@ class AccessGuardAspectsTest {
 
         @Bean
         AccessAuditAspect accessAuditAspect(AuditTrail auditTrail) {
-            return new AccessAuditAspect(auditTrail);
+            return new AccessAuditAspect(auditTrail, new MethodExpressions());
         }
 
         @Bean
@@ -144,7 +144,12 @@ class AccessGuardAspectsTest {
         InOrder order = inOrder(profileService, auditTrail);
         order.verify(profileService).requireConsentingPatient();
         order.verify(auditTrail)
-                .record(AccessAction.CREATE, ResourceType.ASSESSMENT, AccessOutcome.ALLOWED, null);
+                .record(
+                        AccessAction.CREATE,
+                        ResourceType.ASSESSMENT,
+                        null,
+                        AccessOutcome.ALLOWED,
+                        null);
     }
 
     @Test
@@ -159,6 +164,7 @@ class AccessGuardAspectsTest {
                 .record(
                         AccessAction.CREATE,
                         ResourceType.ASSESSMENT,
+                        null,
                         AccessOutcome.DENIED,
                         "consent-required");
     }
@@ -173,6 +179,7 @@ class AccessGuardAspectsTest {
                 .record(
                         AccessAction.CREATE,
                         ResourceType.ASSESSMENT,
+                        null,
                         AccessOutcome.DENIED,
                         "forbidden");
     }
@@ -187,6 +194,7 @@ class AccessGuardAspectsTest {
                 .record(
                         AccessAction.UPDATE,
                         ResourceType.ASSESSMENT,
+                        null,
                         AccessOutcome.FAILED,
                         "InvalidAssessmentRequestException");
     }
@@ -199,6 +207,7 @@ class AccessGuardAspectsTest {
                 .record(
                         AccessAction.READ,
                         ResourceType.PATIENT_PROFILE,
+                        null,
                         AccessOutcome.FAILED,
                         "profile-not-found");
     }
@@ -212,6 +221,7 @@ class AccessGuardAspectsTest {
                 .record(
                         AccessAction.READ,
                         ResourceType.PATIENT_PROFILE,
+                        null,
                         AccessOutcome.DENIED,
                         "unauthenticated");
     }
@@ -220,7 +230,7 @@ class AccessGuardAspectsTest {
     void anAuditFailureDoesNotChangeTheResult() {
         doThrow(new IllegalStateException("database down"))
                 .when(auditTrail)
-                .record(any(), any(), any(), any());
+                .record(any(), any(), any(), any(), any());
 
         assertThat(target.assess()).isEqualTo("result");
     }
@@ -231,7 +241,7 @@ class AccessGuardAspectsTest {
         when(profileService.requireConsentingPatient()).thenThrow(refusal);
         doThrow(new IllegalStateException("database down"))
                 .when(auditTrail)
-                .record(any(), any(), any(), any());
+                .record(any(), any(), any(), any(), any());
 
         assertThatThrownBy(target::assess).isSameAs(refusal);
     }

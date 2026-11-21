@@ -21,6 +21,31 @@ security:
 
 paths:
   /api/assessments:
+    get:
+      tags:
+        - Assessments
+      summary: List the signed-in patient's stored assessments, newest first.
+      description: >-
+        MDD Iteration 7. Returns a summary of every assessment the signed-in patient ran.
+        Needs a patient with a verified email, but no active consent: withdrawing consent stops
+        new processing, not access to the patient's own data.
+      operationId: listAssessments
+      responses:
+        '200':
+          description: The patient's assessments, newest first (may be empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssessmentSummary'
+        '401':
+          description: >-
+            Missing, invalid, expired or revoked session token (WWW-Authenticate: Bearer).
+        '403':
+          description: >-
+            Not a patient with a verified email (urn:pocket-doc:problem:profile-required,
+            email-not-verified, account-quarantined or forbidden).
     post:
       tags:
         - Assessments
@@ -82,7 +107,10 @@ paths:
         returns a re-ranked result, which may itself carry another follow-up question.
         The loop ends when the response's prediction result has needsFollowUp = false.
         Requires a signed-in patient with an active consent (MDD Iteration 6); the patient
-        is taken from the session token.
+        is taken from the session token. MDD Iteration 7: with assessmentId, the stored
+        assessment is updated and the server uses its stored confirmed and denied symptoms
+        and rounds; only the answer is needed. Without assessmentId (older clients), the
+        stateless path runs and a new assessment is stored.
       operationId: submitFollowup
       requestBody:
         required: true
@@ -98,7 +126,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/AssessmentResponse'
         '400':
-          description: The payload carried no confirmed symptoms to predict from.
+          description: >-
+            The payload carried no confirmed symptoms to predict from, or an assessmentId
+            without an answer (urn:pocket-doc:problem:invalid-followup).
         '401':
           description: >-
             Missing, invalid, expired or revoked session token (WWW-Authenticate: Bearer).
@@ -106,6 +136,15 @@ paths:
           description: >-
             Not a patient with an active consent (see POST /api/assessments for the
             problem types).
+        '404':
+          description: >-
+            No assessment with this id belongs to the patient
+            (urn:pocket-doc:problem:assessment-not-found). Unknown ids and other patients'
+            ids get the same answer.
+        '409':
+          description: >-
+            The assessment is already completed (urn:pocket-doc:problem:assessment-completed),
+            or another answer was saved first (urn:pocket-doc:problem:assessment-conflict).
         '422':
           description: The prediction service could not identify a supported symptom.
         '502':
@@ -114,6 +153,39 @@ paths:
           description: >-
             The prediction service is temporarily unavailable, or the identity service
             could not confirm the session (urn:pocket-doc:problem:identity-unavailable).
+  /api/assessments/{assessmentId}:
+    get:
+      tags:
+        - Assessments
+      summary: Open one of the signed-in patient's stored assessments.
+      description: >-
+        MDD Iteration 7. Returns the input, the follow-up state, the latest result and the
+        report of one assessment. Only its owner can read it; needs a verified email but no
+        active consent.
+      operationId: getAssessment
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The stored assessment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentDetail'
+        '401':
+          description: >-
+            Missing, invalid, expired or revoked session token (WWW-Authenticate: Bearer).
+        '403':
+          description: Not a patient with a verified email (see GET /api/assessments).
+        '404':
+          description: >-
+            No assessment with this id belongs to the patient
+            (urn:pocket-doc:problem:assessment-not-found).
 
 components:
   securitySchemes:
@@ -210,9 +282,15 @@ components:
       type: object
       description: >-
         Inbound contract for POST /api/assessments/followup. The client carries back the
-        symptoms confirmed and denied so far (the loop is stateless on the server) plus the
-        answer to the most recent question.
+        symptoms confirmed and denied so far plus the answer to the most recent question.
+        MDD Iteration 7: send assessmentId and answer only; the server keeps the state.
       properties:
+        assessmentId:
+          type: string
+          format: uuid
+          description: >-
+            The stored assessment to continue. When present, confirmedSymptoms,
+            deniedSymptoms and roundsUsed are ignored and answer is required.
         confirmedSymptoms:
           type: array
           description: Canonical symptom names known present so far (original parse + every yes).
@@ -278,6 +356,131 @@ components:
           $ref: '#/components/schemas/Urgency'
           nullable: true
 
+    AssessmentStatus:
+      type: string
+      description: >-
+        IN_PROGRESS while a follow-up question is unanswered; COMPLETED when the result is
+        final or an emergency ended the loop.
+      enum:
+        - IN_PROGRESS
+        - COMPLETED
+    ReportStatus:
+      type: string
+      description: >-
+        Status of the report for a specialist. Stays DRAFT until reports can be sent to a
+        doctor (Iteration 12).
+      enum:
+        - DRAFT
+        - SENT
+        - OPENED
+        - REVIEWED
+    ReportSummary:
+      type: object
+      description: The report of a stored assessment.
+      required:
+        - id
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReportStatus'
+        createdAt:
+          type: string
+          format: date-time
+        sentAt:
+          type: string
+          format: date-time
+          nullable: true
+    AssessmentSummary:
+      type: object
+      description: One stored assessment in the patient's list.
+      required:
+        - id
+        - status
+        - createdAt
+        - updatedAt
+        - followUpRounds
+        - reportStatus
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/AssessmentStatus'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        followUpRounds:
+          type: integer
+          format: int32
+          description: How many follow-up questions were answered.
+        topDisease:
+          type: string
+          nullable: true
+          description: The most likely disease in the latest result, if any.
+        topProbability:
+          type: number
+          format: double
+          nullable: true
+        highestUrgency:
+          $ref: '#/components/schemas/Urgency'
+          nullable: true
+        reportStatus:
+          $ref: '#/components/schemas/ReportStatus'
+    AssessmentDetail:
+      type: object
+      description: One stored assessment with its input, follow-up state, result and report.
+      required:
+        - id
+        - status
+        - createdAt
+        - updatedAt
+        - followUpRounds
+        - report
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/AssessmentStatus'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        followUpRounds:
+          type: integer
+          format: int32
+        freeText:
+          type: string
+          nullable: true
+          description: The free text as submitted.
+        symptomEntries:
+          type: array
+          items:
+            $ref: '#/components/schemas/SymptomEntry'
+        confirmedSymptoms:
+          type: array
+          description: Symptoms known present (the first parse plus every yes).
+          items:
+            type: string
+        deniedSymptoms:
+          type: array
+          description: Symptoms answered no.
+          items:
+            type: string
+        result:
+          $ref: '#/components/schemas/PredictionResult'
+          nullable: true
+        report:
+          $ref: '#/components/schemas/ReportSummary'
     Urgency:
       type: string
       description: >-

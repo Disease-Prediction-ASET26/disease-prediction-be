@@ -25,4 +25,12 @@ public @interface AuditedAccess {
     AccessAction action();
 
     ResourceType resource();
+
+    /**
+     * Optional SpEL that yields the id of the record the call touched, stored in the audit row. It
+     * sees the method arguments by name and, after a successful call, the return value as {@code
+     * #result} (null when the call failed), e.g. {@code #id} or {@code #result?.assessmentId}.
+     * Leave empty when the call names no single record.
+     */
+    String resourceId() default "";
 }

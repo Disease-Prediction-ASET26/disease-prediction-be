@@ -1,6 +1,8 @@
 package com.diseaseprediction.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -11,8 +13,13 @@ import com.diseaseprediction.api.model.Explanation;
 import com.diseaseprediction.api.model.PredictionResult;
 import com.diseaseprediction.api.model.RedFlag;
 import com.diseaseprediction.api.model.Urgency;
+import com.diseaseprediction.domain.Patient;
+import com.diseaseprediction.domain.StoredAssessment;
 import com.diseaseprediction.service.assessment.AssessmentApiService;
+import com.diseaseprediction.service.assessment.AssessmentHistoryService;
+import com.diseaseprediction.service.assessment.AssessmentSnapshots;
 import com.diseaseprediction.service.prediction.PredictionClient;
+import com.diseaseprediction.service.profile.ProfileService;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +29,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -49,6 +58,32 @@ class AssessmentControllerTest {
     @Autowired private MockMvc mockMvc;
 
     static class MockConfig {
+        /** The slice has no database: storage and the patient lookup are stubbed. */
+        @Bean
+        ProfileService profileService() {
+            Patient patient = org.mockito.Mockito.mock(Patient.class);
+            when(patient.getId()).thenReturn(UUID.randomUUID());
+            ProfileService profiles = org.mockito.Mockito.mock(ProfileService.class);
+            when(profiles.requireConsentingPatient()).thenReturn(patient);
+            return profiles;
+        }
+
+        @Bean
+        AssessmentHistoryService assessmentHistoryService() {
+            StoredAssessment stored = org.mockito.Mockito.mock(StoredAssessment.class);
+            when(stored.getId()).thenReturn(UUID.randomUUID());
+            AssessmentHistoryService history =
+                    org.mockito.Mockito.mock(AssessmentHistoryService.class);
+            when(history.create(any(), any(), any(), anyInt(), any(), anyBoolean()))
+                    .thenReturn(stored);
+            return history;
+        }
+
+        @Bean
+        AssessmentSnapshots assessmentSnapshots() {
+            return new AssessmentSnapshots(JsonMapper.builder().build());
+        }
+
         @Bean
         PredictionClient predictionClient() {
             PredictionClient client = org.mockito.Mockito.mock(PredictionClient.class);

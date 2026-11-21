@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Writes {@link AccessAuditEvent}s. Each event is saved in its own transaction ({@code
@@ -39,7 +40,11 @@ public class AuditTrail {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AccessAuditEvent record(
-            AccessAction action, ResourceType resource, AccessOutcome outcome, String reasonCode) {
+            AccessAction action,
+            ResourceType resource,
+            UUID resourceId,
+            AccessOutcome outcome,
+            String reasonCode) {
         Optional<User> actor = currentActor();
         return repository.save(
                 new AccessAuditEvent(
@@ -47,7 +52,7 @@ public class AuditTrail {
                         actor.map(User::getRole).orElse(null),
                         action,
                         resource,
-                        null,
+                        resourceId,
                         outcome,
                         reasonCode));
     }
