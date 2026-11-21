@@ -201,6 +201,22 @@ passkeys work for `http://localhost:5173`, and Google login is not configured lo
 `docker compose down -v` deletes all local Hanko users. The configuration is in
 `local/hanko/config.yaml`.
 
+#### Calling the API without the frontend
+
+`local/hanko-token.py` signs in to the local Hanko with an email passcode, reads the passcode
+from Mailpit, and prints the session token. Unknown emails are registered first. `--onboard`
+also creates a patient profile with consent if the account has none.
+
+```bash
+TOKEN=$(./local/hanko-token.py ana@test.com --onboard --name "Ana Pop")
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/me
+curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"freeText": "cough and fever"}' http://localhost:8080/api/assessments
+```
+
+Use a second email to test as another patient. Tokens last 1 hour; run the script again for a
+new one. It needs Python 3.9+ and the local stack, and refuses any host other than localhost.
+
 To use another Hanko instance, set these variables (the dev values are in the docs repo,
 `mdd/iteration6/README.md`, "Environments"):
 
