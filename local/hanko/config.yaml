@@ -1,0 +1,47 @@
+# Local Hanko for development only (compose.yaml). Mirrors the dev instance in
+# disease-prediction-gitops (clusters/oracle/auth/hanko/development.yaml) where it matters for the
+# app: same Hanko version, email passcodes, session JWT returned in X-Auth-Token, 1 hour sessions.
+# Differences: signup is on, origins are localhost, mail goes to Mailpit, no Google login.
+# The signing-key encryption key comes from SECRETS_KEYS (HANKO_SECRETS_KEY in .env).
+database:
+  host: hanko-db
+  port: "5432"
+  database: hanko
+  user: hanko
+  password: hanko
+  dialect: postgres
+account:
+  allow_signup: true
+service:
+  name: Pocket Doc (local)
+email_delivery:
+  enabled: true
+  from_name: Pocket Doc (local)
+  from_address: noreply@pocket-doc.local
+  smtp:
+    host: mailpit
+    port: "1025"
+cors:
+  allow_origins:
+    - http://localhost:5173
+webauthn:
+  relying_party:
+    id: localhost
+    display_name: Pocket Doc (local)
+    origins:
+      - http://localhost:5173
+session:
+  issuer: http://localhost:8100
+  audience:
+    - pocket-doc-local
+  lifespan: 1h
+  acquire_ip_address: false
+  enable_auth_token_header: true
+  cookie:
+    # Safari does not store Secure cookies on http://localhost.
+    secure: false
+    http_only: true
+    same_site: lax
+rate_limiter:
+  enabled: true
+  store: in_memory
