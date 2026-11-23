@@ -81,7 +81,7 @@ services:
 
   # Catches Hanko's passcode emails. Web UI on http://localhost:8025.
   mailpit:
-    image: axllent/mailpit:v1.27
+    image: axllent/mailpit:v1.34
     container_name: disease-prediction-mailpit
     restart: unless-stopped
     ports:
