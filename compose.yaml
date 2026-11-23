@@ -49,7 +49,7 @@ services:
       retries: 10
 
   hanko-migrate:
-    image: ghcr.io/teamhanko/hanko:v3.1.0
+    image: ghcr.io/teamhanko/hanko:v3.2.0
     command: --config /etc/hanko/config.yaml migrate up
     environment:
       SECRETS_KEYS: ${HANKO_SECRETS_KEY:?Set HANKO_SECRETS_KEY in .env (copy .env.example to .env)}
@@ -61,7 +61,7 @@ services:
     restart: on-failure
 
   hanko:
-    image: ghcr.io/teamhanko/hanko:v3.1.0
+    image: ghcr.io/teamhanko/hanko:v3.2.0
     container_name: disease-prediction-hanko
     restart: unless-stopped
     # Public API only, like the cluster. The admin API (8001) is not started.
