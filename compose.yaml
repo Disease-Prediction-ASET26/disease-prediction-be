@@ -11,7 +11,7 @@
 # For local development only. Production databases and Hanko are not configured here.
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:19-alpine
     container_name: disease-prediction-postgres
     restart: unless-stopped
     environment:
@@ -33,7 +33,7 @@ services:
 
   # Hanko's own database, separate from the app database (as in the cluster).
   hanko-db:
-    image: postgres:18-alpine
+    image: postgres:19-alpine
     container_name: disease-prediction-hanko-db
     restart: unless-stopped
     environment:
