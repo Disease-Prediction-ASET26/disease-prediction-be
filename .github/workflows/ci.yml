@@ -34,7 +34,7 @@ jobs:
   secret-scan:
     if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
       && github.event.action != 'closed' }}
-    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/secret-scan.yml@76e94bd640d92a3ffbf20e9cd5914e22b5ca40cd # shared secret scan
+    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/secret-scan.yml@fa91ac76885b8cad6548bc1b3cf54682efefdf30 # shared secret scan
     permissions:
       contents: read
   lint:
@@ -180,7 +180,7 @@ jobs:
       && github.event.action != 'closed' }}
     needs:
     - build
-    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/dependency-scan.yml@1969329126dd827dd42a7843637163867cb1045b # Maven suppression forwarding
+    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/dependency-scan.yml@fcc942bf43906f471e09e61036b265ed68c3bc08 # shared advisory policy
     permissions:
       contents: read
       packages: read
@@ -204,7 +204,7 @@ jobs:
     - integration-test
     - sonarqube
     - owasp
-    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/container.yml@4c34af8c536e99eff863c654c603f096d3234010 # GitOps base handling
+    uses: Disease-Prediction-ASET26/disease-prediction-ci/.github/workflows/container.yml@aeed2f2a56af2c9e3935cecd6c66e761de546857 # SemVer image publishing
     permissions:
       contents: read
       packages: write
@@ -214,6 +214,7 @@ jobs:
       dev-dockerfile: Dockerfile.dev
       production-dockerfile: Dockerfile.prod
       gitops-image-name: backend
+      version-file: pom.xml
     secrets: inherit
   ci:
     if: ${{ always() && ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name ==

@@ -2,13 +2,16 @@ package com.diseaseprediction.service.prediction;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.diseaseprediction.api.model.PredictionResult;
+import com.diseaseprediction.api.model.RedFlag;
 import com.diseaseprediction.api.model.SymptomEntry;
+import com.diseaseprediction.api.model.Urgency;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -44,6 +47,8 @@ class HttpPredictionClientTest {
                                     "disease_name": "Common Cold",
                                     "probability": 0.82,
                                     "specialty": "General Practice",
+                                    "description": "A common viral infection of the nose and throat.",
+                                    "precautions": ["rest", "drink fluids", "stay warm"],
                                     "explanation": {
                                       "summary": "Cough is a common symptom.",
                                       "contribution_weights": {"cough": 0.5}
@@ -69,8 +74,166 @@ class HttpPredictionClientTest {
         assertEquals("Common Cold", result.getPredictions().getFirst().getDiseaseName());
         assertEquals(0.82, result.getPredictions().getFirst().getProbability());
         assertEquals(
+                "A common viral infection of the nose and throat.",
+                result.getPredictions().getFirst().getDescription());
+        assertEquals(
+                List.of("rest", "drink fluids", "stay warm"),
+                result.getPredictions().getFirst().getPrecautions());
+        assertEquals(
                 Map.of("cough", 0.5),
                 result.getPredictions().getFirst().getExplanation().getContributionWeights());
         server.verify();
+    }
+
+    @Test
+    void mapsFollowUpFieldsFromPredictResponse() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://prediction.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://prediction.test/predict"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(
+                        withSuccess(
+                                """
+                                {
+                                  "disclaimer": "This is not a medical diagnosis.",
+                                  "active_symptoms": ["itching"],
+                                  "needs_follow_up": true,
+                                  "follow_up": {
+                                    "symptom": "nodal_skin_eruptions",
+                                    "question": "Do you also have nodal skin eruptions?",
+                                    "top_disease": "Fungal infection",
+                                    "confidence": 0.48
+                                  },
+                                  "predictions": [{
+                                    "rank": 1,
+                                    "disease_name": "Fungal infection",
+                                    "probability": 0.48
+                                  }]
+                                }
+                                """,
+                                MediaType.APPLICATION_JSON));
+
+        HttpPredictionClient client = new HttpPredictionClient(builder.build(), 5);
+
+        PredictionResult result = client.predict("itching", List.of());
+
+        assertEquals(List.of("itching"), result.getActiveSymptoms());
+        assertEquals(true, result.getNeedsFollowUp());
+        assertNotNull(result.getFollowUp());
+        assertEquals("nodal_skin_eruptions", result.getFollowUp().getSymptom());
+        assertEquals("Do you also have nodal skin eruptions?", result.getFollowUp().getQuestion());
+        assertEquals("Fungal infection", result.getFollowUp().getTopDisease());
+        assertEquals(0.48, result.getFollowUp().getConfidence());
+        server.verify();
+    }
+
+    @Test
+    void predictFollowUpPostsConfirmedAndDeniedSymptoms() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://prediction.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://prediction.test/predict/followup"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(
+                        content()
+                                .json(
+                                        """
+                                        {
+                                          "confirmed_symptoms": ["itching", "nodal_skin_eruptions"],
+                                          "denied_symptoms": [],
+                                          "answer": null,
+                                          "rounds_used": 1,
+                                          "top_k": 5
+                                        }
+                                        """))
+                .andRespond(
+                        withSuccess(
+                                """
+                                {
+                                  "disclaimer": "This is not a medical diagnosis.",
+                                  "active_symptoms": ["itching", "nodal_skin_eruptions"],
+                                  "needs_follow_up": false,
+                                  "follow_up": null,
+                                  "predictions": [{
+                                    "rank": 1,
+                                    "disease_name": "Fungal infection",
+                                    "probability": 0.97
+                                  }]
+                                }
+                                """,
+                                MediaType.APPLICATION_JSON));
+
+        HttpPredictionClient client = new HttpPredictionClient(builder.build(), 5);
+
+        PredictionResult result =
+                client.predictFollowUp(List.of("itching", "nodal_skin_eruptions"), List.of(), 1);
+
+        assertEquals(false, result.getNeedsFollowUp());
+        assertEquals("Fungal infection", result.getPredictions().getFirst().getDiseaseName());
+        assertEquals(0.97, result.getPredictions().getFirst().getProbability());
+        server.verify();
+    }
+
+    @Test
+    void relaysRedFlagsAndHighestUrgency() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://prediction.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://prediction.test/predict"))
+                .andRespond(
+                        withSuccess(
+                                """
+                                {
+                                  "disclaimer": "This is not a medical diagnosis.",
+                                  "active_symptoms": ["breathlessness", "chest_pain"],
+                                  "predictions": [],
+                                  "red_flags": [
+                                    {
+                                      "name": "possible_cardiac_event",
+                                      "urgency": "EMERGENCY",
+                                      "message": "Call emergency services (112) now.",
+                                      "matched_symptoms": ["breathlessness", "chest_pain"]
+                                    },
+                                    {
+                                      "name": "acute_breathing_difficulty",
+                                      "urgency": "URGENT",
+                                      "message": "See a doctor promptly today.",
+                                      "matched_symptoms": ["breathlessness"]
+                                    }
+                                  ],
+                                  "highest_urgency": "EMERGENCY"
+                                }
+                                """,
+                                MediaType.APPLICATION_JSON));
+
+        PredictionResult result =
+                new HttpPredictionClient(builder.build(), 5)
+                        .predict("chest pain and short of breath", List.of());
+
+        assertEquals(Urgency.EMERGENCY, result.getHighestUrgency());
+        assertEquals(2, result.getRedFlags().size());
+        RedFlag first = result.getRedFlags().getFirst();
+        assertEquals("possible_cardiac_event", first.getName());
+        assertEquals(Urgency.EMERGENCY, first.getUrgency());
+        assertEquals("Call emergency services (112) now.", first.getMessage());
+        assertEquals(List.of("breathlessness", "chest_pain"), first.getMatchedSymptoms());
+        assertEquals(Urgency.URGENT, result.getRedFlags().get(1).getUrgency());
+    }
+
+    @Test
+    void missingRedFlagFieldsMeanNoUrgency() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://prediction.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://prediction.test/predict"))
+                .andRespond(
+                        withSuccess(
+                                """
+                                {"disclaimer": "x", "active_symptoms": ["cough"], "predictions": []}
+                                """,
+                                MediaType.APPLICATION_JSON));
+
+        PredictionResult result =
+                new HttpPredictionClient(builder.build(), 5).predict("cough", List.of());
+
+        assertEquals(List.of(), result.getRedFlags());
+        assertNull(result.getHighestUrgency());
     }
 }

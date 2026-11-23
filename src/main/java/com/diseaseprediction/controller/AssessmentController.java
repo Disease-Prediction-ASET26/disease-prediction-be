@@ -1,12 +1,18 @@
 package com.diseaseprediction.controller;
 
 import com.diseaseprediction.api.AssessmentsApi;
+import com.diseaseprediction.api.model.AssessmentDetail;
 import com.diseaseprediction.api.model.AssessmentRequest;
 import com.diseaseprediction.api.model.AssessmentResponse;
+import com.diseaseprediction.api.model.AssessmentSummary;
+import com.diseaseprediction.api.model.FollowupRequest;
 import com.diseaseprediction.service.assessment.AssessmentApiService;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Web entry point for patient assessments.
@@ -37,5 +43,30 @@ public class AssessmentController implements AssessmentsApi {
     @Override
     public ResponseEntity<AssessmentResponse> submitAssessment(AssessmentRequest request) {
         return ResponseEntity.ok(assessmentApiService.runAssessment(request));
+    }
+
+    /**
+     * Answer a follow-up question and receive an updated prediction. Thin pass-through: the service
+     * resolves the answer into the running symptom sets, re-ranks across the SOA boundary, and may
+     * return another follow-up question (loop ends when {@code result.needsFollowUp} is false).
+     *
+     * @param request the follow-up payload (confirmed/denied symptoms so far + the latest answer)
+     * @return 200 with an {@link AssessmentResponse}
+     */
+    @Override
+    public ResponseEntity<AssessmentResponse> submitFollowup(FollowupRequest request) {
+        return ResponseEntity.ok(assessmentApiService.continueAssessment(request));
+    }
+
+    /** The signed-in patient's stored assessments, newest first (MDD Iteration 7). */
+    @Override
+    public ResponseEntity<List<AssessmentSummary>> listAssessments() {
+        return ResponseEntity.ok(assessmentApiService.listAssessments());
+    }
+
+    /** One stored assessment of the signed-in patient (MDD Iteration 7). */
+    @Override
+    public ResponseEntity<AssessmentDetail> getAssessment(UUID assessmentId) {
+        return ResponseEntity.ok(assessmentApiService.getAssessment(assessmentId));
     }
 }

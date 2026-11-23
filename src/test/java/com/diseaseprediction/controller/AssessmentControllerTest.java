@@ -1,6 +1,8 @@
 package com.diseaseprediction.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -9,16 +11,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.diseaseprediction.api.model.DiseasePrediction;
 import com.diseaseprediction.api.model.Explanation;
 import com.diseaseprediction.api.model.PredictionResult;
+import com.diseaseprediction.api.model.RedFlag;
+import com.diseaseprediction.api.model.Urgency;
+import com.diseaseprediction.domain.Patient;
+import com.diseaseprediction.domain.StoredAssessment;
 import com.diseaseprediction.service.assessment.AssessmentApiService;
+import com.diseaseprediction.service.assessment.AssessmentHistoryService;
+import com.diseaseprediction.service.assessment.AssessmentSnapshots;
 import com.diseaseprediction.service.prediction.PredictionClient;
+import com.diseaseprediction.service.profile.ProfileService;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -32,17 +44,54 @@ import java.util.UUID;
  * to {@code HttpStatus.BAD_REQUEST}) rather than from an inline controller check; the external
  * assertions below are unchanged. The {@link PredictionClient} is mocked so the backend slice is
  * tested without a live Python service.
+ *
+ * <p>Security filters are off here: this slice tests the web contract. Authentication and the
+ * consent rule are covered by {@code ProfileApiIntegrationTest} and {@code
+ * ApiSecurityIntegrationTest}. The access guard aspects are not part of this slice, so the consent
+ * rule does not apply here.
  */
 @WebMvcTest(AssessmentController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import({AssessmentApiService.class, AssessmentControllerTest.MockConfig.class})
 class AssessmentControllerTest {
 
     @Autowired private MockMvc mockMvc;
 
     static class MockConfig {
+        /** The slice has no database: storage and the patient lookup are stubbed. */
+        @Bean
+        ProfileService profileService() {
+            Patient patient = org.mockito.Mockito.mock(Patient.class);
+            when(patient.getId()).thenReturn(UUID.randomUUID());
+            ProfileService profiles = org.mockito.Mockito.mock(ProfileService.class);
+            when(profiles.requireConsentingPatient()).thenReturn(patient);
+            return profiles;
+        }
+
+        @Bean
+        AssessmentHistoryService assessmentHistoryService() {
+            StoredAssessment stored = org.mockito.Mockito.mock(StoredAssessment.class);
+            when(stored.getId()).thenReturn(UUID.randomUUID());
+            AssessmentHistoryService history =
+                    org.mockito.Mockito.mock(AssessmentHistoryService.class);
+            when(history.create(any(), any(), any(), anyInt(), any(), anyBoolean()))
+                    .thenReturn(stored);
+            return history;
+        }
+
+        @Bean
+        AssessmentSnapshots assessmentSnapshots() {
+            return new AssessmentSnapshots(JsonMapper.builder().build());
+        }
+
         @Bean
         PredictionClient predictionClient() {
             PredictionClient client = org.mockito.Mockito.mock(PredictionClient.class);
+            stub(client);
+            return client;
+        }
+
+        static void stub(PredictionClient client) {
             PredictionResult stub =
                     new PredictionResult()
                             .resultId(UUID.randomUUID())
@@ -62,7 +111,19 @@ class AssessmentControllerTest {
                                                                                     "cough",
                                                                                     0.5)))));
             when(client.predict(any(), any())).thenReturn(stub);
-            return client;
+            when(client.predictFollowUp(any(), any(), org.mockito.ArgumentMatchers.anyInt()))
+                    .thenReturn(
+                            new PredictionResult()
+                                    .resultId(UUID.randomUUID())
+                                    .generatedAt(OffsetDateTime.parse("2026-10-31T12:00:00Z"))
+                                    .disclaimer("This is not a medical diagnosis")
+                                    .needsFollowUp(false)
+                                    .predictions(
+                                            List.of(
+                                                    new DiseasePrediction()
+                                                            .rank(1)
+                                                            .probability(0.97)
+                                                            .diseaseName("Fungal infection"))));
         }
     }
 
@@ -104,8 +165,57 @@ class AssessmentControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Autowired private PredictionClient predictionClient;
+
     @Test
-    void chestPainIsFlaggedAsEmergency() throws Exception {
+    void emergencyUrgencyFromThePredictionServiceIsRelayed() throws Exception {
+        PredictionResult emergency =
+                new PredictionResult()
+                        .resultId(UUID.randomUUID())
+                        .generatedAt(OffsetDateTime.parse("2026-10-31T12:00:00Z"))
+                        .disclaimer("This is not a medical diagnosis")
+                        .predictions(List.of())
+                        .redFlags(
+                                List.of(
+                                        new RedFlag()
+                                                .name("possible_cardiac_event")
+                                                .urgency(Urgency.EMERGENCY)
+                                                .message("Call emergency services (112) now.")
+                                                .matchedSymptoms(
+                                                        List.of("breathlessness", "chest_pain"))))
+                        .highestUrgency(Urgency.EMERGENCY);
+        org.mockito.Mockito.doReturn(emergency).when(predictionClient).predict(any(), any());
+        try {
+            String body =
+                    """
+                    {
+                      "symptomEntries": [
+                        { "rawText": "chest_pain", "severity": "MODERATE", "durationDays": 0, "isMapped": true },
+                        { "rawText": "breathlessness", "severity": "SEVERE", "durationDays": 0, "isMapped": true }
+                      ]
+                    }
+                    """;
+
+            mockMvc.perform(
+                            post("/api/assessments")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.emergencyDetected").value(true))
+                    .andExpect(jsonPath("$.result.highestUrgency").value("EMERGENCY"))
+                    .andExpect(
+                            jsonPath("$.result.redFlags[0].name").value("possible_cardiac_event"))
+                    .andExpect(
+                            jsonPath("$.result.redFlags[0].matchedSymptoms[1]")
+                                    .value("chest_pain"));
+        } finally {
+            org.mockito.Mockito.reset(predictionClient);
+            MockConfig.stub(predictionClient);
+        }
+    }
+
+    @Test
+    void noUrgencyFromThePredictionServiceIsNotAnEmergency() throws Exception {
         String body =
                 """
                 { "freeText": "severe chest pain and sweating", "symptomEntries": [] }
@@ -116,64 +226,43 @@ class AssessmentControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.emergencyDetected").value(true));
-    }
-
-    @Test
-    void checkedChestPainSymptomIsFlaggedAsEmergency() throws Exception {
-        String body =
-                """
-                {
-                  "freeText": "",
-                  "symptomEntries": [
-                    { "rawText": "chest_pain", "severity": "MODERATE", "durationDays": 0, "isMapped": true }
-                  ]
-                }
-                """;
-
-        mockMvc.perform(
-                        post("/api/assessments")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.emergencyDetected").value(true));
-    }
-
-    @Test
-    void checkedBreathlessnessSymptomIsFlaggedAsEmergency() throws Exception {
-        String body =
-                """
-                {
-                  "symptomEntries": [
-                    { "rawText": "breathlessness", "severity": "SEVERE", "durationDays": 0, "isMapped": true }
-                  ]
-                }
-                """;
-
-        mockMvc.perform(
-                        post("/api/assessments")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.emergencyDetected").value(true));
-    }
-
-    @Test
-    void ordinaryCheckedSymptomIsNotAnEmergency() throws Exception {
-        String body =
-                """
-                {
-                  "symptomEntries": [
-                    { "rawText": "cough", "severity": "MILD", "durationDays": 0, "isMapped": true }
-                  ]
-                }
-                """;
-
-        mockMvc.perform(
-                        post("/api/assessments")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(body))
-                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.emergencyDetected").value(false));
+    }
+
+    @Test
+    void followupReturns200WithUpdatedPrediction() throws Exception {
+        String body =
+                """
+                {
+                  "confirmedSymptoms": ["itching"],
+                  "deniedSymptoms": [],
+                  "answer": { "symptom": "nodal_skin_eruptions", "present": true },
+                  "roundsUsed": 0
+                }
+                """;
+
+        mockMvc.perform(
+                        post("/api/assessments/followup")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assessmentId").exists())
+                .andExpect(jsonPath("$.result.needsFollowUp").value(false))
+                .andExpect(
+                        jsonPath("$.result.predictions[0].diseaseName").value("Fungal infection"));
+    }
+
+    @Test
+    void followupWithNoConfirmedSymptomsReturns400() throws Exception {
+        String body =
+                """
+                { "confirmedSymptoms": [], "deniedSymptoms": [], "roundsUsed": 0 }
+                """;
+
+        mockMvc.perform(
+                        post("/api/assessments/followup")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isBadRequest());
     }
 }

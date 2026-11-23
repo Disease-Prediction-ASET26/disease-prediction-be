@@ -1,0 +1,223 @@
+openapi: 3.0.3
+info:
+  title: Disease Prediction Profile API
+  description: >-
+    The signed-in user's own profile and consent (MDD Iteration 6, FR-G1, UC1 step 1).
+    Hanko handles registration and login; on the first login the user has a valid
+    session but no profile yet, so GET /api/me returns 404 and the app asks for the
+    profile data and consent. The user is always taken from the session token,
+    never from the request body.
+  version: 1.0.0
+servers:
+  - url: /
+    description: Disease Prediction backend
+tags:
+  - name: Profile
+    description: The signed-in user's profile and consent.
+security:
+  - bearerAuth: []
+paths:
+  /api/me:
+    get:
+      tags:
+        - Profile
+      summary: Get the signed-in user's profile.
+      operationId: getProfile
+      responses:
+        '200':
+          description: The profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: >-
+            First login: the session is valid but no profile exists yet
+            (type urn:pocket-doc:problem:profile-not-found).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          $ref: '#/components/responses/IdentityUnavailable'
+    post:
+      tags:
+        - Profile
+      summary: Create the signed-in user's patient profile (first-login onboarding).
+      description: >-
+        Creates a patient profile and records the first consent. The email address is taken
+        from the session token and must be verified. Every new profile is a patient.
+      operationId: createProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProfileRequest'
+      responses:
+        '201':
+          description: Profile created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          description: >-
+            Invalid input, consent not granted (urn:pocket-doc:problem:consent-required) or
+            the session has no verified email (urn:pocket-doc:problem:email-not-verified).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: A profile already exists (urn:pocket-doc:problem:profile-exists).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          $ref: '#/components/responses/IdentityUnavailable'
+  /api/me/consents:
+    post:
+      tags:
+        - Profile
+      summary: Grant or revoke consent for health-data processing.
+      description: >-
+        Appends one entry to the patient's consent history (FR-G1). The latest entry is the
+        current consent. Only patients have consent.
+      operationId: recordConsent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentRequest'
+      responses:
+        '201':
+          description: Consent recorded; the updated profile is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/IdentityUnavailable'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Hanko session token, sent as "Authorization: Bearer <token>".'
+  responses:
+    Unauthorized:
+      description: >-
+        Missing, invalid, expired or revoked session token. The response carries
+        "WWW-Authenticate: Bearer".
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: >-
+        The user may not do this: no profile yet (urn:pocket-doc:problem:profile-required),
+        no verified primary email (urn:pocket-doc:problem:email-not-verified),
+        no active consent (urn:pocket-doc:problem:consent-required), a quarantined identity
+        (urn:pocket-doc:problem:account-quarantined), or the wrong role
+        (urn:pocket-doc:problem:forbidden).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    IdentityUnavailable:
+      description: >-
+        The identity service could not confirm an uncached session, so the request is refused
+        (urn:pocket-doc:problem:identity-unavailable).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Role:
+      type: string
+      enum:
+        - PATIENT
+        - DOCTOR
+        - ADMIN
+    Profile:
+      type: object
+      required:
+        - id
+        - email
+        - fullName
+        - role
+        - consentGranted
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        dateOfBirth:
+          type: string
+          format: date
+          description: Patients only; optional.
+        consentGranted:
+          type: boolean
+          description: True when the latest consent entry is a grant. Always false for non-patients.
+    CreateProfileRequest:
+      type: object
+      required:
+        - fullName
+        - consentGranted
+      properties:
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        dateOfBirth:
+          type: string
+          format: date
+          description: Optional; must be in the past.
+        consentGranted:
+          type: boolean
+          description: Must be true. Consent is required before any health data is processed.
+    ConsentRequest:
+      type: object
+      required:
+        - granted
+      properties:
+        granted:
+          type: boolean
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+          description: Short form of the type, for example profile-not-found.

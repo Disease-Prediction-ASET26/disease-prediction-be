@@ -1,11 +1,14 @@
-# Local development database for the backend.
+# Local development services for the backend: the app database and a local Hanko for login
+# (MDD Iteration 6), with Mailpit catching the passcode emails.
 #
-#   cp .env.example .env      # once, then set a password in .env
-#   docker compose up -d      # start PostgreSQL
-#   docker compose down       # stop it (data is kept in the named volume)
-#   docker compose down -v    # stop it AND delete all local data
+#   cp .env.example .env      # once, then set POSTGRES_PASSWORD, DATA_ENCRYPTION_KEY, HANKO_SECRETS_KEY
+#   docker compose up -d      # start everything
+#   docker compose down       # stop (data is kept in the named volumes)
+#   docker compose down -v    # stop AND delete all local data, including Hanko users
 #
-# For local development only. Production databases are not configured here.
+#   Hanko public API: http://localhost:8100   Mailpit (passcode emails): http://localhost:8025
+#
+# For local development only. Production databases and Hanko are not configured here.
 services:
   postgres:
     image: postgres:18-alpine
@@ -28,5 +31,62 @@ services:
       timeout: 5s
       retries: 10
 
+  # Hanko's own database, separate from the app database (as in the cluster).
+  hanko-db:
+    image: postgres:18-alpine
+    container_name: disease-prediction-hanko-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hanko
+      POSTGRES_USER: hanko
+      POSTGRES_PASSWORD: hanko
+    volumes:
+      - hanko-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hanko -d hanko"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  hanko-migrate:
+    image: ghcr.io/teamhanko/hanko:v3.1.0
+    command: --config /etc/hanko/config.yaml migrate up
+    environment:
+      SECRETS_KEYS: ${HANKO_SECRETS_KEY:?Set HANKO_SECRETS_KEY in .env (copy .env.example to .env)}
+    volumes:
+      - ./local/hanko/config.yaml:/etc/hanko/config.yaml:ro
+    depends_on:
+      hanko-db:
+        condition: service_healthy
+    restart: on-failure
+
+  hanko:
+    image: ghcr.io/teamhanko/hanko:v3.1.0
+    container_name: disease-prediction-hanko
+    restart: unless-stopped
+    # Public API only, like the cluster. The admin API (8001) is not started.
+    command: serve --config /etc/hanko/config.yaml public
+    environment:
+      SECRETS_KEYS: ${HANKO_SECRETS_KEY:?Set HANKO_SECRETS_KEY in .env (copy .env.example to .env)}
+    volumes:
+      - ./local/hanko/config.yaml:/etc/hanko/config.yaml:ro
+    ports:
+      # Host port 8100: the prediction service already uses 8000 locally.
+      - "127.0.0.1:8100:8000"
+    depends_on:
+      hanko-migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+
+  # Catches Hanko's passcode emails. Web UI on http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: disease-prediction-mailpit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
+
 volumes:
   postgres-data:
+  hanko-data:

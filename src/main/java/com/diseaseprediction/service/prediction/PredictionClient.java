@@ -22,4 +22,18 @@ public interface PredictionClient {
      * @return the ranked prediction result produced by the prediction service
      */
     PredictionResult predict(String freeText, List<SymptomEntry> symptomEntries);
+
+    /**
+     * Continue an adaptive assessment after a follow-up answer.
+     *
+     * <p>The loop is stateless on the server: the caller carries the symptoms confirmed and denied
+     * so far, and the service re-ranks and may return another follow-up question.
+     *
+     * @param confirmedSymptoms canonical symptom names known present so far
+     * @param deniedSymptoms canonical symptom names answered no so far
+     * @param roundsUsed how many follow-up questions have already been answered
+     * @return the re-ranked prediction result, possibly carrying another follow-up question
+     */
+    PredictionResult predictFollowUp(
+            List<String> confirmedSymptoms, List<String> deniedSymptoms, int roundsUsed);
 }

@@ -2,8 +2,11 @@ package com.diseaseprediction.service.prediction;
 
 import com.diseaseprediction.api.model.DiseasePrediction;
 import com.diseaseprediction.api.model.Explanation;
+import com.diseaseprediction.api.model.FollowUp;
 import com.diseaseprediction.api.model.PredictionResult;
+import com.diseaseprediction.api.model.RedFlag;
 import com.diseaseprediction.api.model.SymptomEntry;
+import com.diseaseprediction.api.model.Urgency;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -61,13 +64,39 @@ public class HttpPredictionClient implements PredictionClient {
                     HttpStatus.BAD_REQUEST, "Add a symptom description before submitting.");
         }
 
+        AiPredictionResponse response = call("/predict", new AiPredictionRequest(text, topK));
+        return toPredictionResult(response);
+    }
+
+    @Override
+    public PredictionResult predictFollowUp(
+            List<String> confirmedSymptoms, List<String> deniedSymptoms, int roundsUsed) {
+        List<String> confirmed = confirmedSymptoms == null ? List.of() : confirmedSymptoms;
+        if (confirmed.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "No confirmed symptoms to predict from.");
+        }
+
+        AiFollowUpRequest request =
+                new AiFollowUpRequest(
+                        confirmed,
+                        deniedSymptoms == null ? List.of() : deniedSymptoms,
+                        null,
+                        roundsUsed,
+                        topK);
+        AiPredictionResponse response = call("/predict/followup", request);
+        return toPredictionResult(response);
+    }
+
+    /** POST a body to the prediction service and map transport errors to HTTP statuses. */
+    private AiPredictionResponse call(String path, Object body) {
         AiPredictionResponse response;
         try {
             response =
                     restClient
                             .post()
-                            .uri("/predict")
-                            .body(new AiPredictionRequest(text, topK))
+                            .uri(path)
+                            .body(body)
                             .retrieve()
                             .body(AiPredictionResponse.class);
         } catch (HttpClientErrorException.UnprocessableEntity exception) {
@@ -89,8 +118,7 @@ public class HttpPredictionClient implements PredictionClient {
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY, "The prediction service returned an empty response.");
         }
-
-        return toPredictionResult(response);
+        return response;
     }
 
     private static String toPredictionText(String freeText, List<SymptomEntry> symptomEntries) {
@@ -128,14 +156,59 @@ public class HttpPredictionClient implements PredictionClient {
                                 .map(HttpPredictionClient::toDiseasePrediction)
                                 .toList();
 
-        return new PredictionResult()
-                .resultId(UUID.randomUUID())
-                .generatedAt(OffsetDateTime.now(ZoneOffset.UTC))
-                .disclaimer(
-                        response.disclaimer() == null || response.disclaimer().isBlank()
-                                ? DISCLAIMER
-                                : response.disclaimer())
-                .predictions(predictions);
+        PredictionResult result =
+                new PredictionResult()
+                        .resultId(UUID.randomUUID())
+                        .generatedAt(OffsetDateTime.now(ZoneOffset.UTC))
+                        .disclaimer(
+                                response.disclaimer() == null || response.disclaimer().isBlank()
+                                        ? DISCLAIMER
+                                        : response.disclaimer())
+                        .predictions(predictions)
+                        .activeSymptoms(
+                                response.activeSymptoms() == null
+                                        ? List.of()
+                                        : response.activeSymptoms())
+                        .needsFollowUp(Boolean.TRUE.equals(response.needsFollowUp()))
+                        .redFlags(
+                                response.redFlags() == null
+                                        ? List.of()
+                                        : response.redFlags().stream()
+                                                .map(HttpPredictionClient::toRedFlag)
+                                                .toList())
+                        .highestUrgency(toUrgency(response.highestUrgency()));
+
+        if (response.followUp() != null) {
+            AiFollowUp followUp = response.followUp();
+            result.followUp(
+                    new FollowUp()
+                            .symptom(followUp.symptom())
+                            .question(followUp.question())
+                            .topDisease(followUp.topDisease())
+                            .confidence(followUp.confidence()));
+        }
+        return result;
+    }
+
+    private static RedFlag toRedFlag(AiRedFlag flag) {
+        return new RedFlag()
+                .name(flag.name())
+                .urgency(toUrgency(flag.urgency()))
+                .message(flag.message())
+                .matchedSymptoms(
+                        flag.matchedSymptoms() == null ? List.of() : flag.matchedSymptoms());
+    }
+
+    /** Maps the service's urgency string; unknown or missing values mean "no urgency". */
+    private static Urgency toUrgency(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Urgency.fromValue(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     private static DiseasePrediction toDiseasePrediction(AiPrediction prediction) {
@@ -143,7 +216,12 @@ public class HttpPredictionClient implements PredictionClient {
                 new DiseasePrediction()
                         .rank(prediction.rank())
                         .probability(prediction.probability())
-                        .diseaseName(prediction.diseaseName());
+                        .diseaseName(prediction.diseaseName())
+                        .description(prediction.description())
+                        .precautions(
+                                prediction.precautions() == null
+                                        ? List.of()
+                                        : prediction.precautions());
         if (prediction.explanation() != null) {
             AiExplanation explanation = prediction.explanation();
             Map<String, Double> weights =
@@ -159,14 +237,47 @@ public class HttpPredictionClient implements PredictionClient {
     private record AiPredictionRequest(
             @JsonProperty("text") String text, @JsonProperty("top_k") int topK) {}
 
+    private record AiFollowUpRequest(
+            @JsonProperty("confirmed_symptoms") List<String> confirmedSymptoms,
+            @JsonProperty("denied_symptoms") List<String> deniedSymptoms,
+            @JsonProperty("answer") AiFollowUpAnswer answer,
+            @JsonProperty("rounds_used") int roundsUsed,
+            @JsonProperty("top_k") int topK) {}
+
+    private record AiFollowUpAnswer(
+            @JsonProperty("symptom") String symptom, @JsonProperty("present") boolean present) {}
+
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record AiPredictionResponse(List<AiPrediction> predictions, String disclaimer) {}
+    private record AiPredictionResponse(
+            List<AiPrediction> predictions,
+            String disclaimer,
+            @JsonProperty("active_symptoms") List<String> activeSymptoms,
+            @JsonProperty("needs_follow_up") Boolean needsFollowUp,
+            @JsonProperty("follow_up") AiFollowUp followUp,
+            @JsonProperty("red_flags") List<AiRedFlag> redFlags,
+            @JsonProperty("highest_urgency") String highestUrgency) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record AiRedFlag(
+            String name,
+            String urgency,
+            String message,
+            @JsonProperty("matched_symptoms") List<String> matchedSymptoms) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record AiFollowUp(
+            String symptom,
+            String question,
+            @JsonProperty("top_disease") String topDisease,
+            double confidence) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record AiPrediction(
             int rank,
             @JsonProperty("disease_name") String diseaseName,
             double probability,
+            String description,
+            List<String> precautions,
             AiExplanation explanation) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
